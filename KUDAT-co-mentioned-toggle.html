@@ -1,0 +1,2421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>KUDAT (쿠닷) | 고대신문 시맨틱 지식 그래프 & 아카이브 플랫폼</title>
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- FontAwesome Icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<!-- GSAP for TextType & Smooth Animation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<!-- Vis.js Network for Interactive Knowledge Graph -->
+<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<!-- html2canvas for Card Chain Image Export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          crimson: {
+            50: '#fdf2f4',
+            100: '#fce7ea',
+            200: '#f9d2d9',
+            500: '#d91d49',
+            700: '#ab0e32',
+            800: '#860029',
+            900: '#67001f',
+            950: '#400010'
+          },
+          slateBg: '#f8fafc'
+        }
+      }
+    }
+  }
+</script>
+<style>
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+  body { 
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; 
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* ========================================================================= */
+  /* 1. TextType Component CSS                                                 */
+  /* ========================================================================= */
+  .text-type {
+    display: inline-block;
+    white-space: pre-wrap;
+  }
+  .text-type__cursor {
+    margin-left: 0.15rem;
+    display: inline-block;
+    opacity: 1;
+    color: #fde047;
+    font-weight: 300;
+  }
+  .text-type__cursor--hidden {
+    display: none;
+  }
+
+  /* ========================================================================= */
+  /* 2. DriftWall Component CSS (사진 가시성 개선: 밝기 상향 & 오버레이 완화) */
+  /* ========================================================================= */
+  .drift-wall {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    perspective: var(--dw-perspective, 1200px);
+    perspective-origin: 50% 50%;
+    --dw-tile-w: 210px;
+    --dw-tile-h: 138px;
+    --dw-gap: 18px;
+    --dw-radius: 14px;
+    --dw-lift: 54px;
+    --dw-dim: 0.72;
+    --dw-gray: 0;
+    --dw-overlay: #400010;
+    --dw-edge: 50%;
+    -webkit-mask-image:
+      radial-gradient(ellipse 90% 90% at 50% 48%, #000 var(--dw-edge), transparent 100%),
+      linear-gradient(to top, #000 var(--dw-edge), transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      radial-gradient(ellipse 90% 90% at 50% 48%, #000 var(--dw-edge), transparent 100%),
+      linear-gradient(to top, #000 var(--dw-edge), transparent 100%);
+    mask-composite: intersect;
+  }
+
+  .drift-wall__plane {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: flex;
+    flex-direction: row;
+    transform-style: preserve-3d;
+    cursor: default;
+    transform-origin: 50% 50%;
+    will-change: transform;
+  }
+
+  .drift-wall__col {
+    position: relative;
+    width: calc(var(--dw-tile-w) + var(--dw-gap));
+    transform-style: preserve-3d;
+  }
+
+  .drift-wall__track {
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+    transform-style: preserve-3d;
+  }
+
+  .drift-wall__tile {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: calc(var(--dw-tile-h) + var(--dw-gap));
+    flex: 0 0 auto;
+    outline: none;
+    transform-style: preserve-3d;
+  }
+
+  .drift-wall__inner {
+    position: absolute;
+    inset: calc(var(--dw-gap) / 2);
+    display: block;
+    border-radius: var(--dw-radius);
+    overflow: hidden;
+    background: #200008;
+    opacity: var(--dw-dim);
+    transform: translateZ(0);
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition:
+      transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .drift-wall__tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: grayscale(var(--dw-gray)) saturate(1.05);
+    transition: filter 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .drift-wall__label {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-align: center;
+    background: linear-gradient(145deg, #4b0013, #170006);
+  }
+
+  .drift-wall__overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--dw-overlay);
+    opacity: 0.32;
+    pointer-events: none;
+    transition: opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .drift-wall__tile:hover .drift-wall__inner,
+  .drift-wall__tile.is-active .drift-wall__inner {
+    opacity: 1;
+    transform: translateZ(var(--dw-lift));
+    box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1.5px rgba(245, 158, 11, 0.8);
+  }
+
+  .drift-wall__tile:hover img,
+  .drift-wall__tile.is-active img {
+    filter: grayscale(0) saturate(1.2);
+  }
+
+  .drift-wall__tile:hover .drift-wall__overlay,
+  .drift-wall__tile.is-active .drift-wall__overlay {
+    opacity: 0.05;
+  }
+
+  @media (max-width: 768px) {
+    .drift-wall {
+      --dw-tile-w: 140px;
+      --dw-tile-h: 92px;
+      --dw-gap: 12px;
+    }
+  }
+
+  /* Graph Canvas */
+  #network-canvas {
+    width: 100%;
+    height: 100%;
+    min-height: 380px;
+    background-color: #fcfcfd;
+  }
+
+  /* Simulated Newspaper Paper */
+  .newspaper-paper {
+    background-color: #f6f1e8;
+    background-image: radial-gradient(#e5dec9 1px, transparent 0);
+    background-size: 20px 20px;
+    box-shadow: inset 0 0 35px rgba(0,0,0,0.06);
+  }
+
+  .vintage-title {
+    font-family: 'Noto Serif KR', serif;
+    letter-spacing: -0.5px;
+  }
+
+  .entity-wiki-link {
+    color: #860029;
+    border-bottom: 1.5px dashed #d91d49;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .entity-wiki-link:hover {
+    background-color: #fce7ea;
+  }
+
+  .bbox-highlight {
+    border: 2.5px solid #d91d49;
+    background-color: rgba(217, 29, 73, 0.12);
+    box-shadow: 0 0 12px rgba(217, 29, 73, 0.4);
+    transition: all 0.3s ease;
+  }
+  .bbox-normal {
+    border: 1px dashed #94a3b8;
+    background-color: rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+  }
+  .bbox-normal:hover {
+    border: 1.5px solid #475569;
+    background-color: rgba(71, 85, 105, 0.1);
+  }
+</style>
+</head>
+<body class="bg-[#f8f9fa] text-slate-800 antialiased h-[100dvh] flex flex-col overflow-hidden">
+
+  <!-- ========================================================================= -->
+  <!-- 0. Top Global Bar & Unified Navigation Header                             -->
+  <!-- ========================================================================= -->
+  <div class="bg-crimson-950 text-crimson-200 text-[11px] py-1 px-4 sm:px-6 border-b border-crimson-900 shrink-0 z-50">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <span class="bg-crimson-800 text-white px-1.5 py-0.2 rounded text-[9px] font-bold">HUSS</span>
+        <span class="hidden md:inline">고려대학교 인문사회 디지털 융합인재양성사업단 & 고대신문 디지털 아카이빙 프로젝트</span>
+        <span class="md:hidden font-bold">고대신문 KUDAT</span>
+      </div>
+      <div class="flex items-center space-x-3 text-[10px] sm:text-[11px]">
+        <span class="bg-amber-400 text-slate-900 font-extrabold px-1.5 py-0.2 rounded text-[9px]">호(虎) × 호(號) 온톨로지</span>
+        <span class="text-crimson-700 hidden sm:inline">|</span>
+        <button onclick="toggleCollectionListModal();" class="text-amber-300 font-bold flex items-center hover:underline">
+          <i class="fa-solid fa-bookmark mr-1"></i>컬렉션 (<span id="headerCollectionCount">0</span>)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <header class="bg-white border-b border-slate-200 z-40 shadow-xs shrink-0">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-2 sm:space-x-3 cursor-pointer shrink-0" onclick="navigateTo('home')">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 bg-crimson-800 rounded-lg flex items-center justify-center text-white shadow-md shrink-0">
+          <i class="fa-solid fa-diagram-project text-base sm:text-lg text-amber-300"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-1.5">
+            <span class="text-base sm:text-lg font-black tracking-tight text-crimson-800">KUDAT</span>
+            <span class="text-[9px] bg-crimson-100 text-crimson-800 font-bold px-1 py-0.2 rounded border border-crimson-200">v1.2</span>
+          </div>
+          <p class="hidden sm:block text-[9px] text-slate-500 font-medium tracking-tight">The Korea University Newspaper Knowledge Graph (2016~2026 dataset)</p>
+        </div>
+      </div>
+
+      <!-- SPA Main View Switcher Tabs -->
+      <nav class="flex items-center space-x-1 text-xs font-bold overflow-x-auto scrollbar-hide py-1">
+        <button id="nav-btn-home" onclick="navigateTo('home')" class="nav-tab px-3 py-1.5 sm:py-2 rounded-xl bg-crimson-50 text-crimson-800 font-black shadow-xs transition flex items-center space-x-1.5 shrink-0">
+          <i class="fa-solid fa-house"></i>
+          <span>1. 메인 홈</span>
+        </button>
+        <button id="nav-btn-graph" onclick="navigateTo('graph')" class="nav-tab px-3 py-1.5 sm:py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition flex items-center space-x-1.5 shrink-0">
+          <i class="fa-solid fa-circle-nodes text-crimson-700"></i>
+          <span>2. 지식 네트워크 탐색기</span>
+        </button>
+        <button id="nav-btn-viewer" onclick="navigateTo('viewer')" class="nav-tab px-3 py-1.5 sm:py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition flex items-center space-x-1.5 shrink-0">
+          <i class="fa-solid fa-newspaper text-crimson-700"></i>
+          <span>3. 기사 본문 뷰어</span>
+        </button>
+      </nav>
+
+      <!-- Right Action: Collection Quick Badge -->
+      <div class="hidden lg:flex items-center space-x-3 shrink-0">
+        <button onclick="navigateTo('graph'); toggleCollectionListModal();" class="flex items-center space-x-2 bg-slate-900 hover:bg-crimson-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow-xs transition">
+          <i class="fa-solid fa-bookmark text-amber-300"></i>
+          <span>내 지식망 컬렉션 (<span id="desktopHeaderCollectionCount">0</span>)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="dataStatus" class="hidden shrink-0 px-4 py-2 text-center text-[11px] font-bold border-b z-30" role="status" aria-live="polite"></div>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN WORKSPACE CONTAINER (SPA Views)                                      -->
+  <!-- ========================================================================= -->
+  <div class="flex-1 relative overflow-hidden flex flex-col">
+
+    <!-- ======================================================================= -->
+    <!-- [VIEW 1]: 메인 홈 & 6대 패싯 브라우징 화면                              -->
+    <!-- ======================================================================= -->
+    <div id="view-home" class="spa-view flex-1 overflow-y-auto scrollbar-custom">
+      
+      <!-- Hero & Integrated Search Section (DriftWall Background Integrated) -->
+      <section class="relative bg-crimson-950 text-white pt-10 sm:pt-14 pb-12 sm:pb-16 px-4 sm:px-6 overflow-hidden min-h-[560px] flex items-center justify-center">
+        
+        <!-- [DriftWall Component Background Layer] -->
+        <div class="absolute inset-0 z-0 pointer-events-auto opacity-85">
+          <div id="heroDriftWall" class="drift-wall">
+            <div id="driftWallPlane" class="drift-wall__plane"></div>
+          </div>
+        </div>
+
+        <!-- Soft Darkening Gradient for Text Contrast -->
+        <div class="absolute inset-0 z-1 bg-gradient-to-b from-crimson-950/70 via-crimson-900/40 to-crimson-950/85 pointer-events-none"></div>
+
+        <div class="max-w-4xl mx-auto text-center relative z-10 w-full">
+
+          <!-- [TextType Component Integrated: 2 Lines Divided by Comma] -->
+          <h1 class="text-2xl sm:text-4xl lg:text-[40px] font-black tracking-tight mb-3 text-white leading-snug drop-shadow-md">
+            <span class="block">2016년부터 2026년까지,</span>
+            <span class="block mt-1 sm:mt-1.5 text-amber-300">
+              <span id="textTypeContent" class="text-type__content"></span><span id="textTypeCursor" class="text-type__cursor">|</span>
+            </span>
+          </h1>
+
+          <!-- [수정 적용]: 너비를 넓히고 줄바꿈 방지(break-keep & md:whitespace-nowrap)를 적용하여 한 줄로 완벽 정렬 -->
+          <p class="text-xs sm:text-sm lg:text-[15px] text-crimson-100/90 mb-6 sm:mb-8 max-w-4xl mx-auto font-light leading-relaxed px-2 drop-shadow break-keep md:whitespace-nowrap">
+            대한민국 신문 아카이브 표준 검색과 대학사 고유의 5대 엔터티(인물·사건·공간·문화·조직) 관계망을 원클릭으로 탐색하세요.
+          </p>
+
+          <!-- Main Search Box Card (글래스모피즘 & 화이트 텍스트 라벨 전면 적용) -->
+          <div class="bg-crimson-950/75 backdrop-blur-xl rounded-3xl p-4 sm:p-6 shadow-2xl text-white text-left border border-white/20">
+            
+            <!-- [1단]: 통합검색 / 개체 탐색 탭 -->
+            <div class="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3.5 text-xs font-bold">
+              <div class="flex space-x-1.5 sm:space-x-2">
+                <button class="px-3 py-1.5 bg-crimson-700 text-white rounded-lg text-[11px] sm:text-xs shadow-xs border border-crimson-500/40">
+                  <i class="fa-solid fa-magnifying-glass mr-1"></i>통합 검색
+                </button>
+                <button onclick="navigateTo('graph')" class="px-3 py-1.5 bg-white/10 text-crimson-100 hover:bg-white/20 rounded-lg transition text-[11px] sm:text-xs border border-white/10">
+                  <i class="fa-solid fa-diagram-project mr-1"></i>개체명(Entity) 탐색
+                </button>
+                <button onclick="navigateTo('viewer')" class="px-3 py-1.5 bg-white/10 text-crimson-100 hover:bg-white/20 rounded-lg transition text-[11px] sm:text-xs border border-white/10">
+                  <i class="fa-solid fa-file-lines mr-1"></i>기사 본문 뷰어
+                </button>
+              </div>
+              <div class="flex items-center space-x-2 text-[11px] text-crimson-200">
+                <label class="flex items-center space-x-1.5 cursor-pointer">
+                  <input type="checkbox" checked class="rounded text-crimson-600 focus:ring-0">
+                  <span class="hidden sm:inline">국한문 자동 동의어 확장</span>
+                  <span class="sm:hidden">동의어 확장</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- [2단]: 메인 키워드 입력창 -->
+            <div class="space-y-1 mb-3">
+              <div class="flex flex-wrap items-baseline gap-x-2">
+                <span class="text-xs sm:text-sm font-black text-white">키워드</span>
+                <span class="text-[10px] sm:text-xs text-white">찾고자 하는 기사의 키워드를 입력하여 검색할 수 있습니다.</span>
+              </div>
+              <div class="relative">
+                <input type="text" 
+                       id="homeSearchInput"
+                       value=""
+                       placeholder="검색어 입력 (예: 등록금 인상, 4·18 구국대장정, 총학생회 선거, 정기고연전)" 
+                       class="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                <i class="fa-regular fa-keyboard absolute right-3.5 top-3 text-slate-400 text-sm cursor-pointer hover:text-slate-600"></i>
+              </div>
+            </div>
+
+            <!-- [3단]: AND / OR / NOT 불리언 연산자 검색 (한 줄 3열 가로 배치) -->
+            <div class="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3.5">
+              <div class="flex items-center bg-white border border-slate-200 rounded-lg sm:rounded-xl p-0.5 sm:p-1 focus-within:ring-2 focus-within:ring-amber-400 transition min-w-0">
+                <select class="boolean-op bg-transparent text-[10px] sm:text-xs font-bold text-slate-800 pl-1 sm:pl-2 pr-0.5 py-1 focus:outline-none cursor-pointer shrink-0">
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                  <option value="NOT">NOT</option>
+                </select>
+                <div class="w-px h-3.5 sm:h-4 bg-slate-200 shrink-0"></div>
+                <input type="text" placeholder="키워드" class="boolean-term w-full min-w-0 bg-transparent px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none">
+              </div>
+              <div class="flex items-center bg-white border border-slate-200 rounded-lg sm:rounded-xl p-0.5 sm:p-1 focus-within:ring-2 focus-within:ring-amber-400 transition min-w-0">
+                <select class="boolean-op bg-transparent text-[10px] sm:text-xs font-bold text-slate-800 pl-1 sm:pl-2 pr-0.5 py-1 focus:outline-none cursor-pointer shrink-0">
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                  <option value="NOT">NOT</option>
+                </select>
+                <div class="w-px h-3.5 sm:h-4 bg-slate-200 shrink-0"></div>
+                <input type="text" placeholder="키워드" class="boolean-term w-full min-w-0 bg-transparent px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none">
+              </div>
+              <div class="flex items-center bg-white border border-slate-200 rounded-lg sm:rounded-xl p-0.5 sm:p-1 focus-within:ring-2 focus-within:ring-amber-400 transition min-w-0">
+                <select class="boolean-op bg-transparent text-[10px] sm:text-xs font-bold text-slate-800 pl-1 sm:pl-2 pr-0.5 py-1 focus:outline-none cursor-pointer shrink-0">
+                  <option value="AND">AND</option>
+                  <option value="OR">OR</option>
+                  <option value="NOT">NOT</option>
+                </select>
+                <div class="w-px h-3.5 sm:h-4 bg-slate-200 shrink-0"></div>
+                <input type="text" placeholder="키워드" class="boolean-term w-full min-w-0 bg-transparent px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none">
+              </div>
+            </div>
+
+            <!-- [4단]: 섹션 / 검색 영역 필터 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3.5 pt-3 border-t border-white/10">
+              <div>
+                <span class="text-[11px] font-bold text-white block mb-1">
+                  <i class="fa-regular fa-newspaper text-amber-300 mr-1"></i>섹션 (기종)
+                </span>
+                <select id="sectionFilter" class="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                  <option value="" selected>전체 섹션</option>
+                  <option value="S1N43">보도</option>
+                  <option value="S1N44">기획</option>
+                  <option value="S1N45">특집</option>
+                  <option value="S1N48">사람들</option>
+                  <option value="S1N49">사진</option>
+                  <option value="S1N50">영상</option>
+                  <option value="S1N52">스포츠</option>
+                  <option value="S1N53">오피니언</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[11px] font-bold text-white block mb-1">
+                  <i class="fa-solid fa-list-check text-amber-300 mr-1"></i>검색 영역
+                </span>
+                <select id="searchScope" class="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                  <option value="all" selected>전체 영역 (제목+본문+엔터티)</option>
+                  <option value="title">제목 + 부제목</option>
+                  <option value="body">본문 텍스트</option>
+                  <option value="entity">검수된 개체명</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- [5단]: 발행일 및 제외 일자 범위 검색 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/10 mb-4">
+              <div>
+                <span class="text-[11px] font-bold text-white block mb-1">
+                  <i class="fa-regular fa-calendar text-amber-300 mr-1"></i>발행일 범위
+                </span>
+                <div class="flex items-center space-x-1.5">
+                  <input id="dateFrom" type="date" value="2016-01-29" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                  <span class="text-white/60 text-xs font-bold">~</span>
+                  <input id="dateTo" type="date" value="2026-06-05" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                </div>
+              </div>
+              <div>
+                <span class="text-[11px] font-bold text-white block mb-1">
+                  <i class="fa-regular fa-calendar-xmark text-amber-300 mr-1"></i>제외 일자
+                </span>
+                <div class="flex items-center space-x-1.5">
+                  <input id="excludeFrom" type="date" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                  <span class="text-white/60 text-xs font-bold">~</span>
+                  <input id="excludeTo" type="date" class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 transition">
+                </div>
+              </div>
+            </div>
+
+            <!-- 검색 실행 버튼 -->
+            <button id="searchButton" class="w-full bg-crimson-600 hover:bg-crimson-500 text-white font-black py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-2 shadow-lg active:scale-[0.99] border border-crimson-400/40 cursor-pointer">
+              <i class="fa-solid fa-magnifying-glass text-xs"></i>
+              <span>고대신문 기사 검색</span>
+            </button>
+
+          </div>
+
+          <!-- 추천 키워드 태그 -->
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
+            <span class="text-crimson-100 font-semibold bg-white/10 px-3 py-1 rounded-full border border-white/10">
+              <i class="fa-solid fa-file-excel text-amber-300 mr-1"></i>기사 분석 범위: 제공 XLSX의 2016–2026년 공개 기사
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section id="searchResultsPanel" class="hidden max-w-7xl mx-auto px-4 sm:px-6 pt-6" aria-live="polite">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="font-black text-slate-900">신문 검색 결과</h2>
+              <p id="searchResultsSummary" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+            <button id="openSelectedGraphButton" class="hidden px-3 py-2 bg-crimson-800 text-white rounded-xl text-xs font-bold">선택 기사 관계망 보기</button>
+          </div>
+          <div id="searchResultsList" class="divide-y divide-slate-100"></div>
+        </div>
+      </section>
+
+      <!-- Main Body Container -->
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
+
+        <!-- 1. 6대 패싯 브라우징 -->
+        <section id="facets" class="hidden">
+          <div class="flex flex-col md:flex-row md:items-end justify-between mb-4 sm:mb-6 pb-2 sm:pb-3 border-b border-slate-200">
+            <div>
+              <div class="flex items-center space-x-1.5 text-crimson-800 font-bold text-[11px] uppercase tracking-wider mb-1">
+                <i class="fa-solid fa-shapes"></i>
+                <span>Faceted Taxonomy Explorer</span>
+              </div>
+              <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">고대신문 6대 특화 패싯 브라우징</h2>
+              <p class="text-xs text-slate-500 mt-1">대학 기록물 고유의 주제, 기종, 캠퍼스 소재, 인명, 단체, 공간별 다차원 분류 체계</p>
+            </div>
+            <!-- Facet Tab Buttons -->
+            <div class="flex space-x-1 mt-3 md:mt-0 bg-slate-100 p-1 rounded-xl text-xs font-bold overflow-x-auto scrollbar-hide">
+              <button onclick="switchFacet('theme')" id="tab-theme" class="facet-tab px-3 py-1.5 rounded-lg bg-crimson-800 text-white shadow-xs transition shrink-0">1. 주제 (8)</button>
+              <button onclick="switchFacet('type')" id="tab-type" class="facet-tab px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white transition shrink-0">2. 기종 (10)</button>
+              <button onclick="switchFacet('subject')" id="tab-subject" class="facet-tab px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white transition shrink-0">3. 캠퍼스 소재 (12)</button>
+              <button onclick="switchFacet('person')" id="tab-person" class="facet-tab px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white transition shrink-0">4. 인명 (20+)</button>
+              <button onclick="switchFacet('org')" id="tab-org" class="facet-tab px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white transition shrink-0">5. 단체·조직 (15+)</button>
+              <button onclick="switchFacet('space')" id="tab-space" class="facet-tab px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white transition shrink-0">6. 캠퍼스 공간 (16+)</button>
+            </div>
+          </div>
+
+          <!-- Facet Panels Container -->
+          <div id="facetContent" class="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs">
+            <div id="panel-theme" class="facet-panel grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 sm:gap-3">
+              <div onclick="navigateTo('viewer')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-graduation-cap"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">교내</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">8,420건</div>
+              </div>
+              <div onclick="navigateTo('graph')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-user-group"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">교우·동문</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">3,120건</div>
+              </div>
+              <div onclick="navigateTo('viewer')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-landmark"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">사회·시사</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">4,890건</div>
+              </div>
+              <div onclick="navigateTo('viewer')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-book-open-reader"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">학술·연구</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">2,780건</div>
+              </div>
+              <div onclick="navigateTo('viewer')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-masks-theater"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">문화·예술</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">3,640건</div>
+              </div>
+              <div onclick="navigateTo('graph')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-scale-balanced"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">정치·자치</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">4,150건</div>
+              </div>
+              <div onclick="navigateTo('viewer')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-chart-line"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">경제·청년</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">1,930건</div>
+              </div>
+              <div onclick="navigateTo('graph'); setTimeout(()=>loadScenario('koyon'), 200);" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-trophy"></i></div>
+                <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">체육·고연전</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">3,210건</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. N년 전 오늘 & 네트워크 랭킹 -->
+        <section class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+          <div class="lg:col-span-2 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+              <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-crimson-100 text-crimson-800 flex items-center justify-center text-xs font-black">
+                  <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <h3 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">N년 전 오늘, 고대신문의 기록</h3>
+              </div>
+              <span class="text-[11px] sm:text-xs text-slate-500 font-medium">기준일: 8월 28일 발행 지면</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+              <div onclick="navigateTo('viewer')" class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-crimson-400 hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2">
+                    <span class="bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">37년 전 오늘 (1989.08.28)</span>
+                    <span class="text-slate-400">제984호 1면 톱</span>
+                  </div>
+                  <h4 class="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 hover:text-crimson-800 leading-snug">
+                    [1면 톱] "등록금 자율화 후폭풍… 학생총회, 본관 앞 철야 농성 돌입"
+                  </h4>
+                  <p class="text-[11px] sm:text-xs text-slate-600 mt-2 line-clamp-2 sm:line-clamp-3 leading-relaxed">
+                    문교부의 등록금 자율화 조치 이후 첫 2학기 개강을 맞아 총학생회와 단과대학생회 연석회의는 인상분 전액 환원을 요구하며 무기한 농성에 결의하였다...
+                  </p>
+                </div>
+                <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                  <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">#1989등록금투쟁</span>
+                  <span class="text-crimson-800 font-bold">듀얼 뷰어로 열기 ➔</span>
+                </div>
+              </div>
+
+              <div onclick="navigateTo('viewer')" class="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-crimson-400 hover:shadow-md transition cursor-pointer flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-[10px] sm:text-[11px] mb-2">
+                    <span class="bg-blue-100 text-blue-900 font-bold px-1.5 py-0.5 rounded">50년 전 오늘 (1976.08.28)</span>
+                    <span class="text-slate-400">제620호 3면 학술</span>
+                  </div>
+                  <h4 class="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 hover:text-crimson-800 leading-snug">
+                    [학술기획] "民族大學의 理念과 現代 學生運動의 座標"
+                  </h4>
+                  <p class="text-[11px] sm:text-xs text-slate-600 mt-2 line-clamp-2 sm:line-clamp-3 leading-relaxed">
+                    본교 국문과 조지훈 교수의 유고와 학보 기고문을 재조명하며, 유신 체제 하에서 고대 정신이 지향해야 할 학문적 자율성을 논한다...
+                  </p>
+                </div>
+                <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                  <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">#조지훈</span>
+                  <span class="text-crimson-800 font-bold">기사 열람 ➔</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Comparison Box -->
+            <div class="bg-gradient-to-r from-crimson-50 to-slate-50 border border-crimson-200 rounded-xl p-4 flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-code-compare text-crimson-800 text-xl"></i>
+                <div>
+                  <div class="text-xs font-bold text-crimson-900">[시대 간 아젠다 교차비교] 등록금 인상 논쟁의 40년 궤적</div>
+                  <div class="text-[11px] text-slate-600">1989년 자율화 반대 투쟁 ↔ 2024년 등심위 기사 연결 비교 뷰어 열람</div>
+                </div>
+              </div>
+              <button onclick="navigateTo('viewer')" class="bg-crimson-800 hover:bg-crimson-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition shrink-0">
+                비교 뷰어 보기
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Network Ranking -->
+          <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 mb-2.5">
+                <h3 class="text-xs sm:text-sm font-bold text-slate-900 flex items-center">
+                  <i class="fa-solid fa-diagram-project text-crimson-800 mr-1.5"></i>
+                  <span>지식 네트워크 연결도 TOP 5</span>
+                </h3>
+                <span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">엔터티 랭킹</span>
+              </div>
+              <ul class="space-y-1.5 text-xs">
+                <li onclick="navigateTo('graph'); setTimeout(()=>loadScenario('418'), 200);" class="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-crimson-50 cursor-pointer transition">
+                  <div class="flex items-center space-x-2">
+                    <span class="w-4 h-4 rounded-full bg-crimson-800 text-white text-[9px] font-bold flex items-center justify-center">1</span>
+                    <span class="font-bold text-slate-800 text-[11px]">4·18 구국대장정</span>
+                  </div>
+                  <span class="text-[10px] font-semibold text-crimson-700">기사 580건</span>
+                </li>
+                <li onclick="navigateTo('graph'); setTimeout(()=>focusSpaceNode('space_demo'), 200);" class="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-crimson-50 cursor-pointer transition">
+                  <div class="flex items-center space-x-2">
+                    <span class="w-4 h-4 rounded-full bg-slate-300 text-slate-700 text-[9px] font-bold flex items-center justify-center">2</span>
+                    <span class="font-bold text-slate-800 text-[11px]">민주광장</span>
+                  </div>
+                  <span class="text-[10px] font-semibold text-crimson-700">기사 1,420건</span>
+                </li>
+                <li onclick="navigateTo('graph'); setTimeout(()=>updateDetailDrawer('per_kimjunyup'), 200);" class="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-crimson-50 cursor-pointer transition">
+                  <div class="flex items-center space-x-2">
+                    <span class="w-4 h-4 rounded-full bg-slate-300 text-slate-700 text-[9px] font-bold flex items-center justify-center">3</span>
+                    <span class="font-bold text-slate-800 text-[11px]">김준엽 총장</span>
+                  </div>
+                  <span class="text-[10px] font-semibold text-crimson-700">기사 295건</span>
+                </li>
+              </ul>
+            </div>
+            <div class="mt-3 pt-2.5 border-t border-slate-100">
+              <button onclick="navigateTo('graph')" class="w-full bg-slate-900 hover:bg-crimson-800 text-white font-bold py-2 sm:py-2.5 rounded-xl text-xs flex items-center justify-center space-x-2 transition">
+                <i class="fa-solid fa-circle-nodes"></i>
+                <span>전체 인터랙티브 네트워크 열기</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. 내 생일의 고대신문 섹션 -->
+        <section class="bg-white rounded-2xl p-4 sm:p-8 border border-slate-200 shadow-xs">
+          <div class="max-w-3xl mx-auto space-y-4 sm:space-y-6">
+            <div class="flex items-center space-x-3 pb-3 border-b border-slate-100">
+              <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-crimson-50 text-crimson-800 flex items-center justify-center text-xl sm:text-2xl shadow-2xs border border-crimson-100 shrink-0">
+                <i class="fa-solid fa-cake-candles"></i>
+              </div>
+              <div>
+                <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">내 생일의 고대신문</h3>
+                <p class="text-[11px] sm:text-xs text-slate-500 font-medium">생일 날짜로 그날의 고대신문을 만나보세요</p>
+              </div>
+            </div>
+
+            <div class="bg-slate-50/70 p-3.5 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+              <div class="grid grid-cols-3 gap-2 items-center">
+                <div class="flex items-center space-x-1">
+                  <select id="birthYear" class="w-full bg-white border border-slate-200 rounded-xl px-2 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-crimson-800 cursor-pointer"></select>
+                  <span class="text-[11px] font-bold text-slate-600 shrink-0">년</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <select id="birthMonth" class="w-full bg-white border border-slate-200 rounded-xl px-2 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-crimson-800 cursor-pointer"></select>
+                  <span class="text-[11px] font-bold text-slate-600 shrink-0">월</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <select id="birthDay" class="w-full bg-white border border-slate-200 rounded-xl px-2 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-crimson-800 cursor-pointer"></select>
+                  <span class="text-[11px] font-bold text-slate-600 shrink-0">일</span>
+                </div>
+              </div>
+
+              <button id="birthdaySearchButton" class="w-full bg-crimson-800 hover:bg-crimson-900 text-white font-black py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm transition shadow-md flex items-center justify-center space-x-2 cursor-pointer">
+                <span>신문 찾기</span>
+              </button>
+            </div>
+
+            <div id="birthdayResultCard" class="hidden pt-2">
+              <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div class="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                  <div id="birthdayResultTitle" class="font-extrabold text-slate-900 text-xs sm:text-sm"></div>
+                  <div id="birthdayNearestDates" class="text-[11px] text-slate-500 mt-1"></div>
+                </div>
+                <div id="birthdayResultsList" class="divide-y divide-slate-100"></div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Footer -->
+      <footer class="bg-slate-900 text-slate-400 text-xs py-8 px-6 border-t border-slate-800 mt-12">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div>
+            <div class="text-white font-bold text-sm mb-1">
+              <span class="text-crimson-500">KUDAT (쿠닷)</span> : 고대신문 시맨틱 지식 아카이브
+            </div>
+            <p class="text-slate-500 text-[11px]">
+              This research was supported by Humanities Utmost Sharing System (HUSS) through the NRF funded by the Ministry of Education.
+            </p>
+          </div>
+          <div class="text-right text-[11px] text-slate-500">
+            <p>© 2026 Korea University Newspaper & DHUSS. All Rights Reserved.</p>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- [VIEW 2]: 인터랙티브 지식 네트워크 탐색기 화면                         -->
+    <!-- ======================================================================= -->
+    <div id="view-graph" class="spa-view hidden flex-1 flex overflow-hidden">
+      
+      <!-- [Left Sidebar]: Entity Filters & Campus Mini-Map (Width: 320px) -->
+      <aside class="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shrink-0 shadow-sm overflow-y-auto scrollbar-custom">
+        <!-- Entity Filters -->
+        <div class="p-4 border-b border-slate-100">
+          <h3 class="text-xs font-bold text-slate-900 mb-2.5 flex items-center justify-between">
+            <span><i class="fa-solid fa-filter text-crimson-800 mr-1.5"></i>6대 엔터티 클래스 필터</span>
+            <span class="text-[10px] text-slate-400 font-normal">다중 토글</span>
+          </h3>
+          <div class="grid grid-cols-2 gap-1.5 text-xs">
+            <label class="flex items-center space-x-2 p-1.5 rounded-lg bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100 transition">
+              <input type="checkbox" checked onchange="toggleEntityType('article')" class="rounded text-red-600 focus:ring-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+              <span class="font-bold text-slate-700 text-[11px]">기사 (Article)</span>
+            </label>
+            <label class="flex items-center space-x-2 p-1.5 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer hover:bg-blue-100 transition">
+              <input type="checkbox" checked onchange="toggleEntityType('person')" class="rounded text-blue-600 focus:ring-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              <span class="font-bold text-slate-700 text-[11px]">인물 (Person)</span>
+            </label>
+            <label class="flex items-center space-x-2 p-1.5 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer hover:bg-amber-100 transition">
+              <input type="checkbox" checked onchange="toggleEntityType('event')" class="rounded text-amber-600 focus:ring-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span class="font-bold text-slate-700 text-[11px]">사건 (Event)</span>
+            </label>
+            <label class="flex items-center space-x-2 p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition">
+              <input type="checkbox" checked onchange="toggleEntityType('space')" class="rounded text-emerald-600 focus:ring-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span class="font-bold text-slate-700 text-[11px]">공간 (Space)</span>
+            </label>
+            <label class="flex items-center space-x-2 p-1.5 rounded-lg bg-purple-50 border border-purple-200 cursor-pointer hover:bg-purple-100 transition">
+              <input type="checkbox" checked onchange="toggleEntityType('org')" class="rounded text-purple-600 focus:ring-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+              <span class="font-bold text-slate-700 text-[11px]">조직 (Org)</span>
+            </label>
+            <label class="flex items-center space-x-2 p-1.5 rounded-lg bg-cyan-50 border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition">
+              <input type="checkbox" checked onchange="toggleEntityType('culture')" class="rounded text-cyan-600 focus:ring-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>
+              <span class="font-bold text-slate-700 text-[11px]">문화 (Culture)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 관계선 필터 -->
+        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+          <h3 class="text-xs font-bold text-slate-900 mb-2.5 flex items-center">
+            <i class="fa-solid fa-code-branch text-crimson-800 mr-1.5"></i>
+            <span>관계선 필터</span>
+          </h3>
+          <label for="coMentionedEdgeToggle" class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 cursor-pointer hover:border-slate-300 transition">
+            <span class="min-w-0">
+              <span class="block text-[11px] font-black text-slate-800">co-mentioned 표시</span>
+              <span id="coMentionedEdgeHelp" class="block mt-0.5 text-[10px] leading-relaxed text-slate-500">같은 기사에 함께 등장한 엔터티 간 점선</span>
+            </span>
+            <input id="coMentionedEdgeToggle"
+                   type="checkbox"
+                   role="switch"
+                   checked
+                   aria-describedby="coMentionedEdgeHelp"
+                   onchange="toggleCoMentionedEdges(this.checked)"
+                   class="sr-only peer">
+            <span aria-hidden="true" class="relative h-5 w-9 shrink-0 rounded-full bg-slate-300 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-crimson-800 peer-focus-visible:ring-offset-2 peer-checked:bg-crimson-800 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4"></span>
+          </label>
+        </div>
+
+        <!-- 기사 선택 (BFS Subgraph Pruning) -->
+        <div class="p-4 border-b border-slate-200 bg-crimson-50/20">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-black text-slate-900 flex items-center">
+              <i class="fa-solid fa-list-check text-crimson-800 mr-1.5"></i>
+              <span>지식망 연계 기사 선택</span>
+            </h3>
+            <div class="space-x-1">
+              <button onclick="selectAllArticles(true)" class="text-[10px] font-bold text-crimson-800 hover:underline">전체</button>
+              <span class="text-slate-300 text-[10px]">|</span>
+              <button onclick="selectAllArticles(false)" class="text-[10px] font-bold text-slate-500 hover:underline">해제</button>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mb-2.5">체크 해제된 기사와 해당 기사에만 엮인 엔터티는 지식망에서 실시간 제외됩니다.</p>
+          <div id="articleCheckboxList" class="space-y-1.5"></div>
+        </div>
+
+        <!-- 지식망 컬렉션 보관함 저장 -->
+        <div class="p-4 border-b border-slate-200 bg-slate-50/70 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-black text-slate-900 flex items-center">
+              <i class="fa-solid fa-bookmark text-amber-600 mr-1.5"></i>
+              <span>지식망 컬렉션 보관함</span>
+            </h3>
+            <button onclick="toggleCollectionListModal()" class="text-[10px] font-bold text-crimson-800 hover:underline">
+              목록 열기 (<span id="sidebarCollectionCount">0</span>)
+            </button>
+          </div>
+          <div class="flex gap-1.5">
+            <input type="text" 
+                   id="collectionNameInput" 
+                   placeholder="컬렉션 제목 입력" 
+                   class="flex-1 text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-crimson-800">
+            <button onclick="saveCurrentCollection()" class="bg-crimson-800 hover:bg-crimson-900 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition shrink-0 shadow-2xs">
+              저장
+            </button>
+          </div>
+        </div>
+
+        <!-- Time Slider -->
+        <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+          <div class="flex items-center justify-between text-xs font-bold text-slate-800 mb-1.5">
+            <span><i class="fa-regular fa-clock text-crimson-800 mr-1"></i>시계열 필터</span>
+            <span id="currentEraLabel" class="text-crimson-700 font-black">전체 연대 (2016~2026)</span>
+          </div>
+          <input type="range" min="0" max="4" value="0" step="1" oninput="changeEra(this.value)" 
+                 class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-crimson-800">
+          <div class="flex justify-between text-[10px] text-slate-400 mt-1 font-semibold">
+            <span>전체</span>
+            <span>2016</span>
+            <span>2019</span>
+            <span>2022</span>
+            <span>2025</span>
+          </div>
+        </div>
+
+        <div class="p-4 flex-1 bg-slate-50/70">
+          <div class="rounded-xl border border-slate-200 bg-white p-3 text-[11px] text-slate-600 leading-relaxed">
+            <p class="font-black text-slate-900 mb-1"><i class="fa-solid fa-file-excel text-emerald-700 mr-1"></i>XLSX-only 관계망</p>
+            <p>검색 결과에서 선택한 기사와 검수 승인된 인물·조직·장소·사건만 표시합니다. 엑셀 범위 밖의 예시 시나리오는 사용하지 않습니다.</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- [Center Canvas]: Interactive Vis.js Graph -->
+      <main class="flex-1 relative bg-[#f8fafc] flex flex-col">
+        <!-- Floating Canvas Controls -->
+        <div class="absolute top-4 left-4 z-10 flex items-center space-x-2 bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl shadow-md border border-slate-200 text-xs">
+          <span class="font-bold text-slate-700 flex items-center">
+            <i class="fa-solid fa-circle-nodes text-crimson-800 mr-1.5"></i>
+            <span id="activeGraphStatus">검색 결과에서 기사를 선택하세요</span>
+          </span>
+          <span class="text-slate-300">|</span>
+          <button onclick="network.fit({animation: true})" class="p-1 text-slate-600 hover:text-crimson-800" title="화면 맞춤"><i class="fa-solid fa-expand"></i></button>
+          <button onclick="zoomIn()" class="p-1 text-slate-600 hover:text-crimson-800" title="확대"><i class="fa-solid fa-plus"></i></button>
+          <button onclick="zoomOut()" class="p-1 text-slate-600 hover:text-crimson-800" title="축소"><i class="fa-solid fa-minus"></i></button>
+        </div>
+
+        <!-- Legend Overlay -->
+        <div class="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-md p-2.5 rounded-xl shadow-md border border-slate-200 text-[10px] space-y-1">
+          <div class="font-bold text-slate-700 mb-1">온톨로지 관계어 범례</div>
+          <div class="flex items-center space-x-2 text-slate-600"><span class="w-3 h-0.5 bg-red-400"></span><span>covers / mentions (보도·언급)</span></div>
+          <div class="flex items-center space-x-2 text-slate-600"><span class="w-3 h-0.5 bg-amber-500"></span><span>participatedIn / hosts (주도·참여)</span></div>
+          <div class="flex items-center space-x-2 text-slate-600"><span class="w-3 h-0.5 bg-emerald-500"></span><span>occurredAt (공간 거점)</span></div>
+          <div class="flex items-center space-x-2 text-slate-600"><span class="w-3 h-0.5 bg-purple-400 stroke-dash"></span><span>temporallyComparesWith (시대비교)</span></div>
+        </div>
+
+        <div id="network-canvas" class="flex-1 cursor-grab active:cursor-grabbing"></div>
+      </main>
+
+      <!-- [Right Sidebar]: Selected Node Detail Drawer & Story Card Chain Dual Tabs (Width: 420px) -->
+      <aside id="detailDrawer" class="w-[420px] bg-white border-l border-slate-200 flex flex-col z-20 shrink-0 shadow-lg overflow-hidden transition-all duration-300">
+        
+        <!-- Right Panel View Switcher Tabs -->
+        <div class="p-2.5 bg-slate-100 border-b border-slate-200 flex space-x-1 shrink-0 text-xs font-bold">
+          <button id="tab-btn-detail" onclick="switchRightPanelTab('detail')" class="flex-1 py-2 rounded-xl bg-white text-crimson-800 shadow-xs flex items-center justify-center space-x-1.5 transition">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>노드 속성 상세</span>
+          </button>
+          <button id="tab-btn-chain" onclick="switchRightPanelTab('chain')" class="flex-1 py-2 rounded-xl text-slate-600 hover:bg-white flex items-center justify-center space-x-1.5 transition">
+            <i class="fa-solid fa-layer-group text-crimson-700"></i>
+            <span>직관적 스토리 카드 체인</span>
+          </button>
+        </div>
+
+        <!-- 1. [TAB 1]: 노드 속성 상세 패널 -->
+        <div id="right-panel-detail" class="flex-1 overflow-y-auto scrollbar-custom flex flex-col">
+          <div class="p-5 bg-gradient-to-r from-crimson-900 to-crimson-800 text-white flex justify-between items-start shrink-0">
+            <div>
+              <span id="drawerBadge" class="text-[10px] bg-slate-300 text-slate-800 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">대기</span>
+              <h2 id="drawerTitle" class="text-lg font-black mt-1.5 tracking-tight text-white leading-snug">기사를 선택하세요</h2>
+              <p id="drawerSub" class="text-xs text-crimson-200 mt-0.5">XLSX에서 추출·검수된 엔터티만 표시합니다.</p>
+            </div>
+          </div>
+
+          <div class="p-5 space-y-5 flex-1 text-xs">
+            <div>
+              <h4 class="font-bold text-slate-900 mb-1.5 flex items-center text-xs">
+                <i class="fa-solid fa-align-left text-crimson-800 mr-1.5"></i>
+                <span>개체 개요 및 역사적 맥락</span>
+              </h4>
+              <p id="drawerDesc" class="text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200">
+                검색 결과에서 기사를 선택하고 관계망 보기를 실행하면 노드 정보가 표시됩니다.
+              </p>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-slate-900 mb-2 flex items-center justify-between text-xs">
+                <span><i class="fa-solid fa-link text-crimson-800 mr-1.5"></i>직접 연결된 핵심 엔터티</span>
+                <span id="drawerNeighborCount" class="text-[10px] text-slate-400">0개 연결</span>
+              </h4>
+              <div id="drawerNeighbors" class="space-y-1.5"></div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="font-bold text-slate-900 flex items-center text-xs">
+                  <i class="fa-solid fa-newspaper text-crimson-800 mr-1.5"></i>
+                  <span>연결된 XLSX 기사 (<span id="drawerArticleCount">0</span>건)</span>
+                </h4>
+                <span class="text-[10px] text-crimson-700 font-bold">듀얼 뷰어 직결</span>
+              </div>
+              <div id="drawerArticles" class="space-y-2.5"></div>
+            </div>
+
+            <div class="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200/80">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[11px] font-bold text-amber-900 flex items-center"><i class="fa-brands fa-wikipedia-w mr-1"></i>위키 주석 및 관계선 기여</span>
+                <span class="text-[10px] bg-amber-200 text-amber-900 font-bold px-1.5 rounded">HITL 검증</span>
+              </div>
+              <p class="text-[10px] text-amber-800 leading-relaxed">연구자 및 재학생 누구나 본 엔터티에 새로운 관계선 또는 각주를 제안할 수 있습니다.</p>
+              <button onclick="navigateTo('viewer')" class="mt-2 w-full py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[10px] transition">
+                + 관계어 및 역사적 주석 추가하기
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. [TAB 2]: 직관적 스토리 카드 체인 패널 (위키 인포박스 스타일 프로필) -->
+        <div id="right-panel-chain" class="hidden flex-1 overflow-y-auto scrollbar-custom p-4 space-y-4 bg-slate-50/50">
+          
+          <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+            <div>
+              <span class="text-[10px] font-extrabold bg-crimson-100 text-crimson-800 px-2 py-0.5 rounded-md">스토리 가이드</span>
+              <h4 class="text-xs font-black text-slate-900 mt-0.5">인물/단체 ➔ 사건 ➔ 공간 ➔ 기사</h4>
+            </div>
+            <button onclick="downloadCardChainAsImage()" class="px-3 py-1.5 bg-crimson-800 hover:bg-crimson-900 text-white text-[11px] font-bold rounded-xl shadow-xs transition flex items-center space-x-1.5 shrink-0">
+              <i class="fa-solid fa-download text-[10px]"></i>
+              <span>체인 이미지 저장</span>
+            </button>
+          </div>
+
+          <!-- Printable / Exportable Card Chain Area -->
+          <div id="storyCardChainExportArea" class="space-y-6 pb-6"></div>
+
+        </div>
+
+      </aside>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- [VIEW 3]: 지면-텍스트 동기화 기사 상세 듀얼 뷰어 화면                  -->
+    <!-- ======================================================================= -->
+    <div id="view-viewer" class="spa-view hidden flex-1 flex flex-col overflow-hidden">
+      
+      <!-- Top Sub-Header Bar -->
+      <div class="bg-crimson-900 text-white px-5 py-2 flex items-center justify-between z-30 shrink-0 shadow-xs">
+        <div class="flex items-center space-x-3 text-xs text-crimson-200">
+          <button onclick="navigateTo('graph')" class="p-1 rounded bg-white/10 hover:bg-white/20 text-white transition text-xs flex items-center space-x-1">
+            <i class="fa-solid fa-diagram-project"></i>
+            <span>그래프 탐색기로</span>
+          </button>
+          <span class="text-crimson-400">|</span>
+          <span id="viewerTopDate">디지털 기사</span>
+          <i class="fa-solid fa-chevron-right text-[8px] text-crimson-400"></i>
+          <span id="viewerTopSection" class="text-white font-bold">기사 상세</span>
+        </div>
+
+        <div class="flex items-center space-x-2 text-xs">
+          <div id="viewerTextModeControls" class="bg-crimson-950/80 p-0.5 rounded-lg border border-crimson-700 flex items-center space-x-1 text-[11px]">
+            <button id="btnTextModern" onclick="setTextMode('modern')" class="px-2.5 py-1 rounded-md bg-crimson-800 text-white font-bold transition">한글 현대어</button>
+            <button id="btnTextOriginal" onclick="setTextMode('original')" class="px-2.5 py-1 rounded-md text-crimson-200 hover:text-white transition">國漢文 原文</button>
+          </div>
+          <button onclick="toggleMiniGraphModal()" class="hidden bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold px-3 py-1 rounded-lg transition items-center space-x-1.5 shadow-xs">
+            <i class="fa-solid fa-circle-nodes"></i>
+            <span>기사 관계망</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Dual Workspace (48% / 52%) -->
+      <div class="flex-1 flex overflow-hidden">
+        
+        <!-- [Left]: Original Print Scan Simulator -->
+        <section id="viewerLegacyScanPanel" class="w-[48%] bg-slate-200 border-r border-slate-300 flex flex-col relative overflow-hidden shrink-0">
+          <div class="bg-slate-100/90 px-4 py-1.5 border-b border-slate-300 flex items-center justify-between text-xs shrink-0">
+            <span class="font-bold text-slate-800 flex items-center text-[11px]">
+              <i class="fa-regular fa-file-pdf text-crimson-800 mr-1.5"></i>
+              <span>제984호 1면 (1989.08.28) 원본 지면</span>
+            </span>
+            <div class="flex items-center space-x-1 bg-white border border-slate-300 rounded-lg p-0.5 text-[10px]">
+              <button onclick="zoomScan(1.1)" class="p-1 hover:bg-slate-100 text-slate-700 rounded"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+              <button onclick="zoomScan(0.9)" class="p-1 hover:bg-slate-100 text-slate-700 rounded"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+              <button onclick="resetScanZoom()" class="p-1 hover:bg-slate-100 text-slate-700 rounded font-bold">100%</button>
+              <span class="text-slate-300">|</span>
+              <button id="btnToggleBBox" onclick="toggleBBox()" class="px-1.5 py-0.5 bg-crimson-50 text-crimson-800 font-bold rounded">BBox ON</button>
+            </div>
+          </div>
+
+          <div id="scanViewport" class="flex-1 overflow-auto scrollbar-custom p-5 flex items-start justify-center">
+            <div id="newspaperSheet" class="newspaper-paper w-[530px] min-h-[740px] p-6 border-2 border-slate-400 rounded-xs shadow-2xl relative transition-transform duration-200 origin-top text-slate-900 select-none">
+              <div class="border-b-2 border-black pb-2 mb-3">
+                <div class="flex justify-between items-end">
+                  <div class="text-[9px] font-bold text-slate-700">1989年 8月 28日 (月曜日)</div>
+                  <div class="text-center">
+                    <h1 class="text-3xl font-black tracking-widest text-slate-950 font-serif border-y-2 border-black py-0.5 px-4 inline-block">高大新聞</h1>
+                    <div class="text-[8.5px] tracking-tight text-slate-600 font-mono mt-0.5">THE KOREA UNIVERSITY NEWSPAPER · 第984號</div>
+                  </div>
+                  <div class="text-[9px] font-bold text-slate-700 text-right">第 1 面 (綜合)</div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-12 gap-3 relative">
+                <div id="bbox-top-article" class="col-span-8 bbox-highlight p-3 rounded cursor-pointer relative">
+                  <div class="absolute -top-2.5 -left-2 bg-crimson-800 text-white text-[9px] font-bold px-1.5 py-0.2 rounded shadow">현재 열람 기사 (1면 톱)</div>
+                  <div class="text-[9.5px] font-bold text-slate-700 mb-1 border-b border-slate-400 pb-0.5">文敎部 授業料 自律化 措置 後暴風… 學生總會 召集</div>
+                  <h2 class="text-base font-black text-slate-950 vintage-title leading-tight mb-2">"授業料 引上 全額 還元하라"<br>總學生會, 本館 前 徹夜 籠城 突入</h2>
+                  <div class="grid grid-cols-2 gap-2 text-[8px] leading-relaxed text-slate-800 font-serif text-justify">
+                    <p>【本報】 1989學年度 第2學期 開講과 함께 本校 總學生會와 各 單科大學生會 連席會議는 문교부의 자율화 조치에 따른 등록금 일방 인상에 강력 반발, 28일 오후 2시 민주광장에서 비상 학생총회를 개최하고...</p>
+                  </div>
+                </div>
+
+                <div class="col-span-4 bbox-normal p-2 rounded cursor-pointer relative">
+                  <span class="text-[8px] bg-slate-200 px-1 py-0.2 rounded font-bold text-slate-700">社說</span>
+                  <h3 class="text-[11px] font-bold text-slate-900 mt-1 mb-1 font-serif leading-snug">大學 自律化의 正道와 財政 公開의 當爲</h3>
+                  <p class="text-[7.5px] text-slate-600 leading-tight font-serif text-justify">등록금 문제를 둘러싼 학내 갈등은 단순한 액수의 차이를 넘어 대학 운영의 민주성에 대한 근본적 물음이다...</p>
+                </div>
+
+                <div class="col-span-12 bbox-normal p-2.5 rounded cursor-pointer flex items-center space-x-3 bg-slate-300/40">
+                  <div class="w-24 h-16 bg-slate-400 rounded flex flex-col items-center justify-center text-slate-700 text-[9px] border border-slate-500 shrink-0">
+                    <i class="fa-regular fa-image text-lg mb-0.5"></i>
+                    <span>[보도 사진]</span>
+                  </div>
+                  <div>
+                    <span class="text-[8px] bg-slate-700 text-white px-1 rounded">화보 단신</span>
+                    <h4 class="text-[11px] font-bold text-slate-900 mt-0.5 font-serif">민주광장 메운 3천 호랑이의 외침</h4>
+                    <p class="text-[8px] text-slate-700 mt-0.5 leading-relaxed font-serif">비상총회를 마친 학생들이 플래카드를 앞세우고 본관으로 행진하고 있다.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- [Right]: Restored OCR Text, Semantic Badges, & Wiki -->
+        <main id="viewerArticlePanel" class="w-[52%] bg-white flex flex-col overflow-y-auto scrollbar-custom">
+          <div class="p-7 max-w-2xl mx-auto space-y-6 flex-1 text-slate-800">
+            <div class="border-b border-slate-200 pb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span id="viewerSectionBadge" class="bg-crimson-800 text-white font-extrabold px-2.5 py-0.5 rounded text-xs">기사</span>
+                <span class="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold">XLSX 수록 기사</span>
+              </div>
+              <h1 id="viewerArticleTitle" class="text-xl font-black text-slate-900 tracking-tight leading-snug">기사를 선택해 주세요</h1>
+              <div id="viewerArticleMeta" class="flex flex-wrap gap-x-3 text-[11px] text-slate-500 mt-3 pt-2 border-t border-slate-100">
+              </div>
+            </div>
+
+            <!-- 5-Entity Semantic Badges -->
+            <div class="bg-crimson-50/50 rounded-xl p-3.5 border border-crimson-100">
+              <div class="text-[11px] font-bold text-crimson-900 mb-2">검수 승인된 엔터티:</div>
+              <div id="viewerEntityBadges" class="flex flex-wrap gap-1.5 text-xs"></div>
+            </div>
+
+            <article id="articleContent" class="text-sm leading-relaxed text-slate-800 space-y-3.5 text-justify"></article>
+          </div>
+        </main>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: 기사 연계 1-Hop 서브그래프 모달                                     -->
+  <!-- ========================================================================= -->
+  <div id="graphModal" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-5 shadow-2xl border border-slate-200 flex flex-col space-y-3">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center"><i class="fa-solid fa-diagram-project text-crimson-800 mr-1.5"></i>기사 연계 서브그래프 (1-Hop)</h3>
+        <button onclick="toggleMiniGraphModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="mini-graph-canvas" class="w-full h-72 bg-slate-50 rounded-xl border border-slate-200"></div>
+      <div class="flex justify-between items-center text-[11px]">
+        <span class="text-slate-500">노드 클릭 시 전체 네트워크로 전환</span>
+        <button onclick="toggleMiniGraphModal(); navigateTo('graph');" class="px-3 py-1.5 bg-crimson-800 text-white font-bold rounded-lg">전체 탐색기 열기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: 지식망 컬렉션 보관함 모달                                          -->
+  <!-- ========================================================================= -->
+  <div id="collectionModal" class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 flex flex-col space-y-3">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center"><i class="fa-solid fa-bookmark text-amber-600 mr-2"></i><span>내 지식망 컬렉션 보관함</span></h3>
+        <button onclick="toggleCollectionListModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="collectionModalList" class="max-h-72 overflow-y-auto scrollbar-custom space-y-2"></div>
+      <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
+        <button onclick="clearAllCollections()" class="text-red-600 hover:underline font-bold text-[11px]">전체 비우기</button>
+        <button onclick="toggleCollectionListModal()" class="px-4 py-1.5 bg-slate-900 text-white font-bold rounded-lg transition">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT: TextType, DriftWall & Full SPA Knowledge Graph Engine         -->
+  <!-- ========================================================================= -->
+  <script>
+    // --- 1. TextType Component Implementation ---
+    function initTextType() {
+      const el = document.getElementById('textTypeContent');
+      const cursor = document.getElementById('textTypeCursor');
+      if (!el || !cursor) return;
+
+      const texts = [
+        "9,958건 온라인 기사를 데이터로 잇다",
+        "검수된 대학사 엔터티를 지식망으로 잇다",
+        "검색·날짜·관계망을 하나로 잇다"
+      ];
+      let textIndex = 0;
+      let charIndex = 0;
+      let isDeleting = false;
+      const typingSpeed = 65;
+      const deletingSpeed = 35;
+      const pauseDuration = 2200;
+
+      // GSAP Cursor Blink
+      if (typeof gsap !== 'undefined') {
+        gsap.to(cursor, {
+          opacity: 0,
+          duration: 0.5,
+          repeat: -1,
+          yoyo: true,
+          ease: 'power2.inOut'
+        });
+      }
+
+      function tick() {
+        const currentText = texts[textIndex];
+        if (isDeleting) {
+          el.textContent = currentText.substring(0, charIndex - 1);
+          charIndex--;
+          if (charIndex === 0) {
+            isDeleting = false;
+            textIndex = (textIndex + 1) % texts.length;
+            setTimeout(tick, 300);
+            return;
+          }
+          setTimeout(tick, deletingSpeed);
+        } else {
+          el.textContent = currentText.substring(0, charIndex + 1);
+          charIndex++;
+          if (charIndex === currentText.length) {
+            isDeleting = true;
+            setTimeout(tick, pauseDuration);
+            return;
+          }
+          setTimeout(tick, typingSpeed);
+        }
+      }
+
+      setTimeout(tick, 400);
+    }
+
+    // --- 2. DriftWall Component Implementation ---
+    const KUNews_Drift_Items = [
+      { title: 'XLSX ARTICLE SEARCH' },
+      { title: 'DATE ARCHIVE' },
+      { title: 'ENTITY NETWORK' },
+      { title: '2016—2026' },
+      { title: 'PERSON · EVENT · PLACE' },
+      { title: 'LOCAL RULE EXTRACTION' },
+      { title: 'REVIEWED ENTITIES' },
+      { title: 'SUPABASE SEARCH' },
+      { title: 'XLSX ONLY' },
+      { title: 'NO SOURCE-PAGE ACCESS' }
+    ];
+
+    function initDriftWall() {
+      const container = document.getElementById('heroDriftWall');
+      const plane = document.getElementById('driftWallPlane');
+      if (!container || !plane) return;
+
+      const isMobile = window.innerWidth < 768;
+      const columnsCount = isMobile ? 3 : 5;
+      const tileWidth = isMobile ? 140 : 210;
+      const tileHeight = isMobile ? 92 : 138;
+      const gap = isMobile ? 12 : 18;
+      const speed = 36;
+      const tilt = 16;
+      const turn = -13;
+      const roll = 0;
+      const depth = 110;
+      const parallax = 0.5;
+
+      const columnItems = Array.from({ length: columnsCount }, () => []);
+      KUNews_Drift_Items.forEach((item, i) => columnItems[i % columnsCount].push(item));
+
+      const containerHeight = container.clientHeight || 560;
+      const unit = tileHeight + gap;
+      const columnMeta = columnItems.map(col => {
+        const copyHeight = Math.max(unit, col.length * unit);
+        const copies = Math.max(2, Math.ceil((containerHeight * 1.8) / copyHeight) + 1);
+        return { copyHeight, copies };
+      });
+
+      plane.innerHTML = '';
+      const trackEls = [];
+
+      columnItems.forEach((col, c) => {
+        const colEl = document.createElement('div');
+        colEl.className = 'drift-wall__col';
+        const trackEl = document.createElement('div');
+        trackEl.className = 'drift-wall__track';
+
+        const meta = columnMeta[c];
+        for (let copyIdx = 0; copyIdx < meta.copies; copyIdx++) {
+          col.forEach((item, itemIdx) => {
+            const tile = document.createElement('div');
+            tile.className = 'drift-wall__tile';
+            tile.setAttribute('data-col', c);
+            tile.innerHTML = `
+              <span class="drift-wall__inner">
+                <span class="drift-wall__label">${item.title}</span>
+                <span class="drift-wall__overlay" aria-hidden="true"></span>
+              </span>
+            `;
+            trackEl.appendChild(tile);
+          });
+        }
+        colEl.appendChild(trackEl);
+        plane.appendChild(colEl);
+        trackEls.push(trackEl);
+      });
+
+      const dirSign = 1;
+      const baseVelocities = columnItems.map((_, c) => {
+        const altSign = c % 2 === 0 ? 1 : -1;
+        const factor = 1 + 0.4 * (((c * 0.618 + 0.35) % 1) * 2 - 1);
+        return speed * factor * dirSign * altSign;
+      });
+
+      const offsets = columnMeta.map((meta, c) => meta.copyHeight * ((c * 0.37) % 1));
+      const velocities = columnItems.map(() => 0);
+      const pointer = { x: 0, y: 0 };
+      const pointerDamped = { x: 0, y: 0 };
+      let lastTs = null;
+
+      container.addEventListener('pointermove', e => {
+        const rect = container.getBoundingClientRect();
+        pointer.x = (e.clientX - rect.left) / rect.width - 0.5;
+        pointer.y = (e.clientY - rect.top) / rect.height - 0.5;
+      });
+
+      container.addEventListener('pointerleave', () => {
+        pointer.x = 0;
+        pointer.y = 0;
+      });
+
+      function animateWall(ts) {
+        if (!lastTs) lastTs = ts;
+        const dt = Math.min(0.05, Math.max(0, ts - lastTs) / 1000);
+        lastTs = ts;
+
+        const maxTilt = parallax * 8;
+        const targetX = pointer.x * maxTilt;
+        const targetY = -pointer.y * maxTilt;
+        const damp = 1 - Math.exp(-dt / 0.12);
+        pointerDamped.x += (targetX - pointerDamped.x) * damp;
+        pointerDamped.y += (targetY - pointerDamped.y) * damp;
+
+        plane.style.transform = `translate(-50%, -50%) scale(1.18) ` +
+          `rotateX(${tilt + pointerDamped.y}deg) rotateY(${turn + pointerDamped.x}deg) rotateZ(${roll}deg) ` +
+          `translateZ(${-depth}px)`;
+
+        for (let c = 0; c < trackEls.length; c++) {
+          const meta = columnMeta[c];
+          if (!meta) continue;
+          const target = baseVelocities[c];
+          const ease = 1 - Math.exp(-dt / 0.28);
+          velocities[c] += (target - velocities[c]) * ease;
+          let next = offsets[c] + velocities[c] * dt;
+          next = ((next % meta.copyHeight) + meta.copyHeight) % meta.copyHeight;
+          offsets[c] = next;
+          trackEls[c].style.transform = `translate3d(0, ${-next}px, 0)`;
+        }
+
+        requestAnimationFrame(animateWall);
+      }
+
+      requestAnimationFrame(animateWall);
+    }
+
+    // --- 3. SPA View Router ---
+    function navigateTo(viewId) {
+      document.querySelectorAll('.spa-view').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.className = 'nav-tab px-3 py-1.5 sm:py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition flex items-center space-x-1.5 shrink-0';
+      });
+
+      const targetView = document.getElementById('view-' + viewId);
+      const targetBtn = document.getElementById('nav-btn-' + viewId);
+
+      if (targetView) targetView.classList.remove('hidden');
+      if (targetBtn) targetBtn.className = 'nav-tab px-3 py-1.5 sm:py-2 rounded-xl bg-crimson-50 text-crimson-800 font-black shadow-xs transition flex items-center space-x-1.5 shrink-0';
+
+      if (viewId === 'graph') {
+        setTimeout(() => {
+          if (!network) initNetwork();
+          else network.fit();
+          renderRightPanelStoryChain();
+        }, 150);
+      }
+    }
+
+    // --- 4. Facet Switcher ---
+    function switchFacet(facetName) {
+      document.querySelectorAll('.facet-panel').forEach(panel => panel.classList.add('hidden'));
+      document.querySelectorAll('.facet-tab').forEach(tab => {
+        tab.className = 'facet-tab px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white transition shrink-0';
+      });
+
+      const targetPanel = document.getElementById('panel-' + facetName);
+      const targetTab = document.getElementById('tab-' + facetName);
+
+      if (targetPanel) targetPanel.classList.remove('hidden');
+      if (targetTab) targetTab.className = 'facet-tab px-3 py-1.5 rounded-lg bg-crimson-800 text-white shadow-xs transition shrink-0';
+    }
+
+    // --- 5. Right Panel Tab Switcher ---
+    function switchRightPanelTab(tab) {
+      const panelDetail = document.getElementById('right-panel-detail');
+      const panelChain = document.getElementById('right-panel-chain');
+      const btnDetail = document.getElementById('tab-btn-detail');
+      const btnChain = document.getElementById('tab-btn-chain');
+
+      if (tab === 'detail') {
+        panelDetail.classList.remove('hidden');
+        panelChain.classList.add('hidden');
+        btnDetail.className = 'flex-1 py-2 rounded-xl bg-white text-crimson-800 shadow-xs flex items-center justify-center space-x-1.5 transition';
+        btnChain.className = 'flex-1 py-2 rounded-xl text-slate-600 hover:bg-white flex items-center justify-center space-x-1.5 transition';
+      } else {
+        panelDetail.classList.add('hidden');
+        panelChain.classList.remove('hidden');
+        btnChain.className = 'flex-1 py-2 rounded-xl bg-white text-crimson-800 shadow-xs flex items-center justify-center space-x-1.5 transition';
+        btnDetail.className = 'flex-1 py-2 rounded-xl text-slate-600 hover:bg-white flex items-center justify-center space-x-1.5 transition';
+        renderRightPanelStoryChain();
+      }
+    }
+
+    // --- 6. Master Ontology Metadata & BFS Subgraph Engine ---
+    let allArticlesList = [];
+    let allNodesData = [];
+    let allEdgesData = [];
+
+    let nodeDetailsMap = {};
+
+    const richStoryClusters = [];
+
+    function renderRightPanelStoryChain() {
+      const container = document.getElementById('storyCardChainExportArea');
+      if (!container) return;
+
+      const activeClusters = richStoryClusters.filter(c => selectedArticleIds.includes(c.triggerArticleId));
+
+      if (activeClusters.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-400 space-y-2">
+            <i class="fa-solid fa-layer-group text-2xl text-slate-300"></i>
+            <p class="text-xs font-bold text-slate-600">선택된 기사에 해당하는 스토리 체인이 없습니다.</p>
+            <p class="text-[11px] text-slate-400">좌측 사이드바에서 기사를 체크해주세요.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = '';
+
+      activeClusters.forEach((cluster, idx) => {
+        const clusterCard = document.createElement('div');
+        clusterCard.className = 'bg-white rounded-3xl p-4 sm:p-5 border-2 border-slate-200 shadow-sm space-y-3.5 relative overflow-hidden';
+        
+        const actorsHTML = cluster.actors.map(act => `
+          <div onclick="switchRightPanelTab('detail'); updateDetailDrawer('${act.nodeId}');" 
+               class="min-w-[275px] max-w-[290px] bg-white border-2 border-crimson-800 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition cursor-pointer snap-center shrink-0 flex flex-col justify-between group">
+            <div>
+              <div class="bg-crimson-800 text-white text-center py-2 px-3 border-b-2 border-crimson-950">
+                <div class="text-[9px] font-extrabold tracking-wider text-crimson-200 uppercase">[${act.type}]</div>
+                <div class="text-base font-black tracking-tight leading-tight mt-0.5">${act.name}</div>
+                <div class="text-[9.5px] text-crimson-100 font-serif mt-0.5">${act.hanjaEng}</div>
+              </div>
+              <div class="bg-slate-100/80 p-3 flex flex-col items-center justify-center border-b border-slate-200">
+                <div class="w-16 h-16 rounded-xl ${act.avatarBg} text-white flex items-center justify-center text-2xl shadow-inner mb-1 group-hover:scale-105 transition">
+                  <i class="fa-solid ${act.avatarIcon}"></i>
+                </div>
+                <span class="text-[8.5px] text-slate-500 font-medium">${act.photoCaption}</span>
+              </div>
+              <div class="w-full text-[10.5px]">
+                <table class="w-full border-collapse">
+                  <tbody>
+                    ${act.infobox.map(row => `
+                      <tr class="border-b border-slate-100 last:border-b-0">
+                        <th class="bg-crimson-800 text-white font-bold px-2 py-1.5 w-16 text-center text-[10px] border-r border-crimson-700 select-none">${row.key}</th>
+                        <td class="bg-white text-slate-800 px-2 py-1.5 text-[10.5px] leading-snug font-medium">${row.val}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="p-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[9.5px]">
+              <div class="flex flex-wrap gap-1">
+                ${act.tags.map(t => `<span class="bg-white border border-slate-200 text-slate-600 px-1 py-0.2 rounded font-medium">${t}</span>`).join('')}
+              </div>
+              <span class="text-crimson-800 font-bold flex items-center">속성 보기 ➔</span>
+            </div>
+          </div>
+        `).join('');
+
+        const eventsHTML = cluster.events.map(ev => `
+          <div onclick="switchRightPanelTab('detail'); updateDetailDrawer('${ev.nodeId}');" 
+               class="w-full bg-amber-50/40 hover:bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-3 transition shadow-xs cursor-pointer group">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="text-[9px] font-black px-1.5 py-0.2 rounded border ${ev.badgeClass}">${ev.type}</span>
+              <span class="text-[10px] text-amber-900 font-bold">${ev.period}</span>
+            </div>
+            <h5 class="text-xs font-black text-slate-900 group-hover:text-amber-900 transition">${ev.title}</h5>
+            <p class="text-[10.5px] text-slate-600 mt-1 leading-relaxed text-justify">${ev.summary}</p>
+          </div>
+        `).join('');
+
+        const spacesHTML = cluster.spaces.map(sp => `
+          <div onclick="switchRightPanelTab('detail'); updateDetailDrawer('${sp.nodeId}');" 
+               class="min-w-[210px] max-w-[230px] bg-emerald-50/40 hover:bg-emerald-50/80 border-2 border-emerald-200 rounded-2xl p-3 transition shadow-xs cursor-pointer snap-center shrink-0">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="text-[9px] font-black px-1.5 py-0.2 rounded border ${sp.badgeClass}">${sp.type}</span>
+              <span class="text-[9px] text-emerald-800 font-medium">${sp.location}</span>
+            </div>
+            <h5 class="text-xs font-black text-slate-900">${sp.name}</h5>
+            <p class="text-[10px] text-slate-600 mt-1 line-clamp-2">${sp.desc}</p>
+          </div>
+        `).join('');
+
+        const articlesHTML = cluster.articles.map(art => `
+          <div class="w-full bg-red-50/40 hover:bg-red-50/80 border-2 border-red-200 rounded-2xl p-3 transition shadow-xs">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="text-[9px] font-black px-1.5 py-0.2 rounded bg-crimson-800 text-white">기사 사료</span>
+              <span class="text-[10px] text-crimson-800 font-bold">${art.issue}</span>
+            </div>
+            <h5 class="text-xs font-black text-slate-900 hover:text-crimson-800 transition">${art.title}</h5>
+            <p class="text-[10.5px] text-slate-600 mt-1 leading-relaxed line-clamp-2">${art.snippet}</p>
+            <div class="mt-2 flex justify-end">
+              <button onclick="navigateTo('viewer')" class="px-2.5 py-1 bg-crimson-800 hover:bg-crimson-900 text-white text-[10px] font-bold rounded-lg shadow-2xs transition flex items-center space-x-1">
+                <span>지면 듀얼 뷰어 열람</span>
+                <i class="fa-solid fa-arrow-right text-[8px]"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+        clusterCard.innerHTML = `
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div class="flex items-center space-x-2">
+              <span class="w-5 h-5 rounded-full bg-crimson-800 text-white text-[10px] font-black flex items-center justify-center">${idx + 1}</span>
+              <h4 class="text-xs font-black text-slate-900">${cluster.themeTitle}</h4>
+            </div>
+            <span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">스토리 체인</span>
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-[10px] font-bold text-slate-500 mb-1.5">
+              <span>1. 주체 위키 프로필 (인물 / 단체)</span>
+              ${cluster.actors.length > 1 ? '<span class="text-crimson-800 animate-pulse">👈 좌우 스와이프</span>' : ''}
+            </div>
+            <div class="flex overflow-x-auto snap-x scrollbar-custom gap-2.5 pb-1">${actorsHTML}</div>
+            <div class="flex flex-col items-center py-1">
+              <div class="w-0.5 h-2.5 bg-slate-300"></div>
+              <div class="bg-blue-800 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full my-0.5">${cluster.relation1.label}</div>
+              <div class="w-0.5 h-2.5 bg-slate-300"></div>
+            </div>
+            <div>
+              <div class="text-[10px] font-bold text-slate-500 mb-1">2. 역사적 사건 (Event)</div>
+              ${eventsHTML}
+            </div>
+            <div class="flex flex-col items-center py-1">
+              <div class="w-0.5 h-2.5 bg-slate-300"></div>
+              <div class="bg-emerald-800 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full my-0.5">${cluster.relation2.label}</div>
+              <div class="w-0.5 h-2.5 bg-slate-300"></div>
+            </div>
+            <div>
+              <div class="text-[10px] font-bold text-slate-500 mb-1">
+                <span>3. 캠퍼스 공간 거점 (Space)</span>
+                ${cluster.spaces.length > 1 ? '<span class="text-emerald-800 animate-pulse">👈 좌우 스와이프</span>' : ''}
+              </div>
+              <div class="flex overflow-x-auto snap-x scrollbar-custom gap-2 pb-1">${spacesHTML}</div>
+            </div>
+            <div class="flex flex-col items-center py-1">
+              <div class="w-0.5 h-2.5 bg-slate-300"></div>
+              <div class="bg-crimson-800 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full my-0.5">${cluster.relation3.label}</div>
+              <div class="w-0.5 h-2.5 bg-slate-300"></div>
+            </div>
+            <div>
+              <div class="text-[10px] font-bold text-slate-500 mb-1">4. 기록 사료 (Article)</div>
+              ${articlesHTML}
+            </div>
+          </div>
+        `;
+        container.appendChild(clusterCard);
+      });
+    }
+
+    function downloadCardChainAsImage() {
+      const targetArea = document.getElementById('storyCardChainExportArea');
+      if (!targetArea) return;
+      html2canvas(targetArea, { scale: 2, useCORS: true, backgroundColor: '#f8fafc' }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `KUDAT_Wiki_Card_Chain_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+
+    let selectedArticleIds = [];
+    let activeEntityFilters = { article: true, person: true, event: true, space: true, org: true, culture: true };
+    let showCoMentionedEdges = true;
+    let network = null;
+    let nodesDataSet = new vis.DataSet([]);
+    let edgesDataSet = new vis.DataSet([]);
+
+    function isCoMentionedEdge(edge) {
+      return edge.kind === 'cooccurrence' || edge.label === 'co-mentioned';
+    }
+
+    function getReachableNodesFromArticles(selectedIds) {
+      if (selectedIds.length === 0) return new Set();
+      const visited = new Set(selectedIds);
+      const queue = [...selectedIds];
+      const adj = {};
+      allNodesData.forEach(n => { adj[n.id] = []; });
+      allEdgesData.forEach(e => {
+        if (adj[e.from] && adj[e.to]) {
+          adj[e.from].push(e.to);
+          adj[e.to].push(e.from);
+        }
+      });
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const neighbors = adj[curr] || [];
+        for (const next of neighbors) {
+          if (!visited.has(next)) {
+            const nextNode = allNodesData.find(n => n.id === next);
+            if (nextNode && nextNode.group === 'article' && !selectedIds.includes(next)) continue;
+            visited.add(next);
+            queue.push(next);
+          }
+        }
+      }
+      return visited;
+    }
+
+    function reconstructKnowledgeGraph() {
+      const reachableNodeIds = getReachableNodesFromArticles(selectedArticleIds);
+      const finalNodes = allNodesData.filter(node => 
+        reachableNodeIds.has(node.id) && activeEntityFilters[node.group] !== false
+      );
+      const finalNodeIdSet = new Set(finalNodes.map(n => n.id));
+      const finalEdges = allEdgesData.filter(edge =>
+        finalNodeIdSet.has(edge.from) &&
+        finalNodeIdSet.has(edge.to) &&
+        (showCoMentionedEdges || !isCoMentionedEdge(edge))
+      );
+
+      nodesDataSet.clear();
+      edgesDataSet.clear();
+      nodesDataSet.add(finalNodes);
+      edgesDataSet.add(finalEdges);
+
+      const statusEl = document.getElementById('activeGraphStatus');
+      if (statusEl) {
+        statusEl.textContent = selectedArticleIds.length === allArticlesList.length
+          ? `전체 지식망 (${finalNodes.length}개 노드 · ${finalEdges.length}개 관계 엣지)`
+          : `재구성 지식망: ${selectedArticleIds.length}개 기사 (${finalNodes.length}개 노드 · ${finalEdges.length}개 엣지)`;
+      }
+
+      if (network) network.fit({ animation: { duration: 350 } });
+      renderRightPanelStoryChain();
+    }
+
+    function renderArticleCheckboxes() {
+      const container = document.getElementById('articleCheckboxList');
+      if (!container) return;
+      container.innerHTML = '';
+      allArticlesList.forEach(art => {
+        const isChecked = selectedArticleIds.includes(art.id);
+        const div = document.createElement('div');
+        div.className = `p-2 rounded-xl border transition cursor-pointer flex items-start space-x-2 ${isChecked ? 'bg-white border-crimson-300 shadow-2xs' : 'bg-slate-100/70 border-slate-200 opacity-60'}`;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = isChecked;
+        checkbox.className = 'mt-0.5 rounded text-crimson-800 focus:ring-0 cursor-pointer';
+        checkbox.addEventListener('change', () => toggleArticleSelection(art.id));
+        const content = document.createElement('div');
+        content.className = 'flex-1 min-w-0';
+        content.addEventListener('click', () => toggleArticleSelection(art.id));
+        const meta = document.createElement('div');
+        meta.className = 'flex items-center justify-between text-[10px] mb-0.5';
+        const issue = document.createElement('span');
+        issue.className = 'text-crimson-800 font-bold';
+        issue.textContent = art.issue || '온라인 기사';
+        const articleDate = document.createElement('span');
+        articleDate.className = 'text-slate-400 font-medium';
+        articleDate.textContent = art.date || '';
+        meta.append(issue, articleDate);
+        const title = document.createElement('h5');
+        title.className = 'font-bold text-slate-800 text-[11px] truncate';
+        title.textContent = art.title || '';
+        content.append(meta, title);
+        div.append(checkbox, content);
+        container.appendChild(div);
+      });
+    }
+
+    function toggleArticleSelection(articleId) {
+      selectedArticleIds = selectedArticleIds.includes(articleId)
+        ? selectedArticleIds.filter(id => id !== articleId)
+        : [...selectedArticleIds, articleId];
+      renderArticleCheckboxes();
+      reconstructKnowledgeGraph();
+    }
+
+    function selectAllArticles(select) {
+      selectedArticleIds = select ? allArticlesList.map(a => a.id) : [];
+      renderArticleCheckboxes();
+      reconstructKnowledgeGraph();
+    }
+
+    function toggleEntityType(type) {
+      activeEntityFilters[type] = !activeEntityFilters[type];
+      reconstructKnowledgeGraph();
+    }
+
+    function toggleCoMentionedEdges(show) {
+      showCoMentionedEdges = Boolean(show);
+      reconstructKnowledgeGraph();
+    }
+
+    function initNetwork() {
+      const container = document.getElementById('network-canvas');
+      const data = { nodes: nodesDataSet, edges: edgesDataSet };
+      const options = {
+        nodes: { borderWidth: 2, shadow: true },
+        edges: { width: 1.5, font: { size: 9, align: 'middle', color: '#64748b' }, smooth: { type: 'continuous' } },
+        physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -50, centralGravity: 0.01, springLength: 95, springConstant: 0.08 } },
+        interaction: { hover: true }
+      };
+      network = new vis.Network(container, data, options);
+      network.on("selectNode", params => {
+        if (params.nodes.length > 0) {
+          switchRightPanelTab('detail');
+          updateDetailDrawer(params.nodes[0]);
+        }
+      });
+      reconstructKnowledgeGraph();
+      if (allNodesData.length) updateDetailDrawer(allNodesData[0].id);
+    }
+
+    function updateDetailDrawer(nodeId) {
+      const details = nodeDetailsMap[nodeId] || {
+        type: '엔터티',
+        badgeClass: 'bg-slate-300 text-slate-800',
+        title: allNodesData.find(n => n.id === nodeId)?.label || nodeId,
+        sub: '고대신문 온톨로지 연계 데이터',
+        desc: '선택된 개체에 대한 지면 기사 추출 정보 및 연관 관계를 분석 중입니다.',
+        neighbors: [],
+        articles: [{ num: '아카이브 색인 기사', title: '해당 개체명이 언급된 고대신문 기사' }]
+      };
+
+      document.getElementById('drawerBadge').textContent = details.type;
+      document.getElementById('drawerBadge').className = `text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${details.badgeClass}`;
+      document.getElementById('drawerTitle').textContent = details.title;
+      document.getElementById('drawerSub').textContent = details.sub;
+      document.getElementById('drawerDesc').textContent = details.desc;
+      document.getElementById('drawerNeighborCount').textContent = `${details.neighbors.length}개 연결`;
+      document.getElementById('drawerArticleCount').textContent = details.articles.length;
+
+      const neighborsContainer = document.getElementById('drawerNeighbors');
+      neighborsContainer.innerHTML = '';
+      details.neighbors.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-crimson-50 transition cursor-pointer';
+        const name = document.createElement('span');
+        name.className = 'font-bold text-slate-800 text-[11px]';
+        name.textContent = `[${n.type}] ${n.name}`;
+        const relation = document.createElement('span');
+        relation.className = 'text-[10px] text-crimson-700 font-medium';
+        relation.textContent = n.relation;
+        div.append(name, relation);
+        neighborsContainer.appendChild(div);
+      });
+
+      const articlesContainer = document.getElementById('drawerArticles');
+      articlesContainer.innerHTML = '';
+      details.articles.forEach(art => {
+        const div = document.createElement('div');
+        div.className = 'p-2.5 bg-slate-50 hover:bg-crimson-50/60 rounded-xl border border-slate-200 transition cursor-pointer';
+        const number = document.createElement('div');
+        number.className = 'text-[10px] font-bold text-crimson-800 mb-0.5';
+        number.textContent = art.num || '';
+        const title = document.createElement('h5');
+        title.className = 'font-bold text-slate-900 text-xs';
+        title.textContent = art.title || '';
+        const button = document.createElement('button');
+        button.className = 'mt-2 text-crimson-800 font-bold text-[10px] flex items-center space-x-1';
+        button.textContent = '기사 본문 열기 ➔';
+        button.addEventListener('click', () => {
+          if (art.articleId && window.kudatOpenArticle) window.kudatOpenArticle(art.articleId);
+          else navigateTo('viewer');
+        });
+        div.append(number, title, button);
+        articlesContainer.appendChild(div);
+      });
+    }
+
+    function focusSpaceNode(nodeId) {
+      if (!network) return;
+      network.selectNodes([nodeId]);
+      network.focus(nodeId, { scale: 1.3, animation: { duration: 500 } });
+      switchRightPanelTab('detail');
+      updateDetailDrawer(nodeId);
+    }
+
+    function changeEra(val) {
+      const eraMap = ['전체 연대 (2016~2026)', '2016~2018', '2019~2021', '2022~2024', '2025~2026'];
+      document.getElementById('currentEraLabel').textContent = eraMap[val];
+    }
+
+    function loadScenario() {}
+
+    function zoomIn() { if (network) network.moveTo({ scale: network.getScale() * 1.2, animation: true }); }
+    function zoomOut() { if (network) network.moveTo({ scale: network.getScale() * 0.8, animation: true }); }
+
+    // --- 7. LocalStorage Collection Management ---
+    function getStoredCollections() {
+      try { return JSON.parse(localStorage.getItem('kudat_collections')) || []; } catch (e) { return []; }
+    }
+    function updateCollectionBadges() {
+      const count = getStoredCollections().length;
+      const headerBadge = document.getElementById('headerCollectionCount');
+      const desktopBadge = document.getElementById('desktopHeaderCollectionCount');
+      const sidebarBadge = document.getElementById('sidebarCollectionCount');
+      if (headerBadge) headerBadge.textContent = count;
+      if (desktopBadge) desktopBadge.textContent = count;
+      if (sidebarBadge) sidebarBadge.textContent = count;
+    }
+    function saveCurrentCollection() {
+      const nameInput = document.getElementById('collectionNameInput');
+      const name = nameInput.value.trim() || `지식망 컬렉션 (${new Date().toLocaleDateString()})`;
+      if (selectedArticleIds.length === 0) { alert('최소 1개 이상의 기사를 선택해주세요.'); return; }
+      const collections = getStoredCollections();
+      collections.unshift({
+        id: 'col_' + Date.now(),
+        name,
+        date: new Date().toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+        articleIds: [...selectedArticleIds],
+        articleCount: selectedArticleIds.length
+      });
+      localStorage.setItem('kudat_collections', JSON.stringify(collections));
+      nameInput.value = '';
+      updateCollectionBadges();
+      alert(`'${name}' 지식망이 보관함에 저장되었습니다.`);
+    }
+    function toggleCollectionListModal() {
+      const modal = document.getElementById('collectionModal');
+      const listEl = document.getElementById('collectionModalList');
+      const collections = getStoredCollections();
+      if (modal.classList.contains('hidden')) {
+        listEl.innerHTML = collections.length === 0
+          ? '<div class="text-center py-6 text-slate-400 text-xs">보관된 컬렉션이 없습니다.</div>'
+          : collections.map(c => `
+            <div class="p-3 bg-slate-50 rounded-xl border flex justify-between items-center text-xs">
+              <div><h5 class="font-bold">${c.name}</h5><span class="text-[10px] text-slate-400">기사 ${c.articleCount}건 · ${c.date}</span></div>
+              <div class="space-x-1">
+                <button onclick="loadCollection('${c.id}')" class="px-2.5 py-1 bg-crimson-800 text-white rounded text-[10px] font-bold">불러오기</button>
+                <button onclick="deleteCollection('${c.id}')" class="px-2 py-1 bg-slate-200 rounded text-[10px]">삭제</button>
+              </div>
+            </div>
+          `).join('');
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+    function loadCollection(colId) {
+      const target = getStoredCollections().find(c => c.id === colId);
+      if (!target) return;
+      const availableIds = new Set(allArticlesList.map(article => article.id));
+      selectedArticleIds = target.articleIds.filter(id => availableIds.has(id));
+      renderArticleCheckboxes();
+      reconstructKnowledgeGraph();
+      toggleCollectionListModal();
+    }
+    function deleteCollection(colId) {
+      localStorage.setItem('kudat_collections', JSON.stringify(getStoredCollections().filter(c => c.id !== colId)));
+      updateCollectionBadges();
+      toggleCollectionListModal(); toggleCollectionListModal();
+    }
+    function clearAllCollections() {
+      localStorage.removeItem('kudat_collections');
+      updateCollectionBadges();
+      toggleCollectionListModal();
+    }
+
+    // --- 8. Dual Viewer Synchronized Engine ---
+    const modernText = '<p>검색 결과에서 XLSX 수록 기사를 선택하세요.</p>';
+    const originalText = modernText;
+
+    function setTextMode(mode) {
+      const container = document.getElementById('articleContent');
+      const btnM = document.getElementById('btnTextModern');
+      const btnO = document.getElementById('btnTextOriginal');
+      if (!container || !btnM || !btnO) return;
+
+      if (mode === 'modern') {
+        container.innerHTML = modernText;
+        btnM.className = 'px-2.5 py-1 rounded-md bg-crimson-800 text-white font-bold transition';
+        btnO.className = 'px-2.5 py-1 rounded-md text-crimson-200 hover:text-white transition';
+      } else {
+        container.innerHTML = originalText;
+        btnO.className = 'px-2.5 py-1 rounded-md bg-crimson-800 text-white font-bold transition';
+        btnM.className = 'px-2.5 py-1 rounded-md text-crimson-200 hover:text-white transition';
+      }
+    }
+
+    let currentScanScale = 1.0;
+    function zoomScan(f) {
+      currentScanScale *= f;
+      if (currentScanScale < 0.7) currentScanScale = 0.7;
+      if (currentScanScale > 2.0) currentScanScale = 2.0;
+      document.getElementById('newspaperSheet').style.transform = `scale(${currentScanScale})`;
+    }
+    function resetScanZoom() {
+      currentScanScale = 1.0;
+      document.getElementById('newspaperSheet').style.transform = 'scale(1.0)';
+    }
+
+    let showBBox = true;
+    function toggleBBox() {
+      showBBox = !showBBox;
+      document.querySelectorAll('.bbox-highlight, .bbox-normal').forEach(b => {
+        b.style.borderColor = showBBox ? '' : 'transparent';
+        b.style.backgroundColor = showBBox ? '' : 'transparent';
+      });
+      document.getElementById('btnToggleBBox').textContent = showBBox ? 'BBox ON' : 'BBox OFF';
+    }
+
+    let miniNetwork = null;
+    function toggleMiniGraphModal() {
+      const modal = document.getElementById('graphModal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden') && !miniNetwork) {
+        setTimeout(initMiniGraph, 100);
+      }
+    }
+
+    function initMiniGraph() {
+      const container = document.getElementById('mini-graph-canvas');
+      miniNetwork = new vis.Network(container, {
+        nodes: new vis.DataSet(allNodesData),
+        edges: new vis.DataSet(allEdgesData)
+      }, { physics: { stabilization: true } });
+    }
+
+    // Supabase 모듈이 실데이터 그래프를 기존 vis-network UI에 주입하는 어댑터.
+    window.kudatApplyGraphData = function(payload) {
+      allArticlesList = payload.articles || [];
+      allNodesData = payload.nodes || [];
+      allEdgesData = payload.edges || [];
+      nodeDetailsMap = payload.details || {};
+      selectedArticleIds = allArticlesList.map(article => article.id);
+      renderArticleCheckboxes();
+      if (!allNodesData.length) {
+        document.getElementById('drawerBadge').textContent = '대기';
+        document.getElementById('drawerTitle').textContent = '기사를 선택하세요';
+        document.getElementById('drawerSub').textContent = 'XLSX에서 추출·검수된 엔터티만 표시합니다.';
+        document.getElementById('drawerDesc').textContent = '검색 결과에서 기사를 선택하고 관계망 보기를 실행하세요.';
+        document.getElementById('drawerNeighborCount').textContent = '0개 연결';
+        document.getElementById('drawerArticleCount').textContent = '0';
+        document.getElementById('drawerNeighbors').replaceChildren();
+        document.getElementById('drawerArticles').replaceChildren();
+      }
+      if (!network && !document.getElementById('view-graph').classList.contains('hidden')) initNetwork();
+      else reconstructKnowledgeGraph();
+    };
+
+    // --- 9. Birthday Newspaper Selector (엑셀 데이터 범위는 모듈이 재설정) ---
+    function initBirthdaySelector() {
+      const yearSelect = document.getElementById('birthYear');
+      const monthSelect = document.getElementById('birthMonth');
+      const daySelect = document.getElementById('birthDay');
+      if (!yearSelect || !monthSelect || !daySelect) return;
+
+      for (let y = 2016; y <= 2026; y++) {
+        const opt = document.createElement('option');
+        opt.value = y; opt.textContent = y;
+        if (y === 2016) opt.selected = true;
+        yearSelect.appendChild(opt);
+      }
+      for (let m = 1; m <= 12; m++) {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        if (m === 2) opt.selected = true;
+        monthSelect.appendChild(opt);
+      }
+      for (let d = 1; d <= 31; d++) {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        if (d === 1) opt.selected = true;
+        daySelect.appendChild(opt);
+      }
+    }
+
+    // --- 10. Master Initialization ---
+    window.onload = () => {
+      renderArticleCheckboxes();
+      updateCollectionBadges();
+      renderRightPanelStoryChain();
+      initTextType();
+      initDriftWall();
+    };
+  </script>
+  <script>
+    // Supabase Dashboard → Project Settings → API에서 아래 두 값만 입력하세요.
+    // publishable 또는 legacy anon 키만 사용하고 secret/service_role 키는 절대 넣지 마세요.
+    window.KUDAT_SUPABASE_CONFIG = Object.freeze({
+      supabaseUrl: '',
+      supabasePublishableKey: '',
+      dataMinDate: '2016-01-29',
+      dataMaxDate: '2026-06-05'
+    });
+  </script>
+  <script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  import DOMPurify from 'https://esm.sh/dompurify@3';
+  const KUDAT_CONFIG = window.KUDAT_SUPABASE_CONFIG;
+  
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => [...document.querySelectorAll(selector)];
+  const selectedArticleIds = new Set();
+  let supabase = null;
+  
+  const KIND_LABELS = {
+    person: '인물', organization: '조직', place: '장소', event: '사건',
+    culture: '문화', policy_program: '정책·프로그램', document: '문서', article: '기사'
+  };
+  
+  const GROUP_MAP = {
+    person: 'person', organization: 'org', place: 'space', event: 'event',
+    culture: 'culture', policy_program: 'event', document: 'culture', article: 'article'
+  };
+  
+  const GROUP_STYLES = {
+    article: { shape: 'box', color: { background: '#fee2e2', border: '#ef4444' }, font: { color: '#991b1b', size: 11, face: 'Pretendard' } },
+    person: { shape: 'dot', size: 17, color: { background: '#3b82f6', border: '#1d4ed8' }, font: { color: '#1e3a8a', size: 11, face: 'Pretendard' } },
+    org: { shape: 'dot', size: 18, color: { background: '#a855f7', border: '#7e22ce' }, font: { color: '#581c87', size: 11, face: 'Pretendard' } },
+    space: { shape: 'dot', size: 18, color: { background: '#10b981', border: '#047857' }, font: { color: '#064e3b', size: 11, face: 'Pretendard' } },
+    event: { shape: 'dot', size: 19, color: { background: '#f59e0b', border: '#b45309' }, font: { color: '#78350f', size: 11, face: 'Pretendard' } },
+    culture: { shape: 'dot', size: 17, color: { background: '#06b6d4', border: '#0891b2' }, font: { color: '#164e63', size: 11, face: 'Pretendard' } }
+  };
+  
+  function showStatus(message, tone = 'info') {
+    const element = $('#dataStatus');
+    if (!element) return;
+    const tones = {
+      info: 'bg-blue-50 text-blue-800 border-blue-200',
+      ok: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      warn: 'bg-amber-50 text-amber-900 border-amber-200',
+      error: 'bg-red-50 text-red-800 border-red-200'
+    };
+    element.className = `shrink-0 px-4 py-2 text-center text-[11px] font-bold border-b z-30 ${tones[tone]}`;
+    element.textContent = message;
+  }
+  
+  function formatDate(value) {
+    if (!value) return '';
+    const [year, month, day] = value.split('-');
+    return `${year}.${month}.${day}`;
+  }
+  
+  function createTextElement(tag, className, text) {
+    const element = document.createElement(tag);
+    element.className = className;
+    element.textContent = text || '';
+    return element;
+  }
+  
+  function createArticleRow(article, { showCheckbox = false } = {}) {
+    const row = document.createElement('article');
+    row.className = 'p-4 sm:p-5 hover:bg-slate-50 transition flex gap-3';
+  
+    if (showCheckbox) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'mt-1 rounded text-crimson-800 focus:ring-crimson-800';
+      checkbox.checked = selectedArticleIds.has(Number(article.id));
+      checkbox.setAttribute('aria-label', `${article.title} 관계망 선택`);
+      checkbox.addEventListener('change', () => {
+        const id = Number(article.id);
+        checkbox.checked ? selectedArticleIds.add(id) : selectedArticleIds.delete(id);
+        updateGraphButton();
+      });
+      row.appendChild(checkbox);
+    }
+  
+    const content = document.createElement('div');
+    content.className = 'min-w-0 flex-1';
+    const meta = [formatDate(article.published_on), article.primary_section_name, article.secondary_section_name, article.author_name]
+      .filter(Boolean).join(' · ');
+    content.appendChild(createTextElement('div', 'text-[11px] font-bold text-crimson-800 mb-1', meta));
+  
+    const titleButton = createTextElement('button', 'text-left text-sm sm:text-base font-black text-slate-900 hover:text-crimson-800 transition', article.title);
+    titleButton.addEventListener('click', () => openArticle(article.id));
+    content.appendChild(titleButton);
+    if (article.subtitle) content.appendChild(createTextElement('p', 'text-xs text-slate-600 mt-1', article.subtitle));
+    if (article.snippet) content.appendChild(createTextElement('p', 'text-xs text-slate-500 mt-2 line-clamp-2', article.snippet));
+  
+    const actions = document.createElement('div');
+    actions.className = 'mt-2 flex flex-wrap gap-2';
+    const openButton = createTextElement('button', 'text-[11px] font-bold text-crimson-800 hover:underline', '기사 읽기 ➔');
+    openButton.addEventListener('click', () => openArticle(article.id));
+    actions.appendChild(openButton);
+    actions.appendChild(createTextElement('span', 'text-[11px] font-bold text-slate-500', 'XLSX 수록 기사'));
+    content.appendChild(actions);
+    row.appendChild(content);
+    return row;
+  }
+  
+  function updateGraphButton() {
+    const button = $('#openSelectedGraphButton');
+    if (!button) return;
+    button.classList.toggle('hidden', selectedArticleIds.size === 0);
+    button.textContent = `선택 ${selectedArticleIds.size}건 관계망 보기`;
+  }
+  
+  async function runSearch() {
+    if (!supabase) {
+      showStatus('먼저 이 HTML 하단의 KUDAT_SUPABASE_CONFIG에 Supabase URL과 publishable 키를 입력하세요.', 'warn');
+      return;
+    }
+    const button = $('#searchButton');
+    button.disabled = true;
+    button.classList.add('opacity-60');
+    const terms = [];
+    const ops = [];
+    $$('.boolean-term').forEach((input, index) => {
+      const value = input.value.trim();
+      if (value) {
+        terms.push(value);
+        ops.push($$('.boolean-op')[index].value);
+      }
+    });
+    const excludeFrom = $('#excludeFrom').value || null;
+    const excludeTo = $('#excludeTo').value || null;
+    if ((excludeFrom && !excludeTo) || (!excludeFrom && excludeTo)) {
+      showStatus('제외 일자는 시작일과 종료일을 모두 입력해야 합니다.', 'warn');
+      button.disabled = false;
+      button.classList.remove('opacity-60');
+      return;
+    }
+  
+    const panel = $('#searchResultsPanel');
+    const list = $('#searchResultsList');
+    panel.classList.remove('hidden');
+    list.replaceChildren(createTextElement('div', 'p-8 text-center text-xs text-slate-500', '검색 중…'));
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  
+    const { data, error } = await supabase.rpc('search_articles', {
+      p_main: $('#homeSearchInput').value.trim(),
+      p_terms: terms,
+      p_ops: ops,
+      p_from: $('#dateFrom').value || null,
+      p_to: $('#dateTo').value || null,
+      p_exclude_from: excludeFrom,
+      p_exclude_to: excludeTo,
+      p_section: $('#sectionFilter').value || null,
+      p_scope: $('#searchScope').value,
+      p_limit: 50,
+      p_offset: 0
+    });
+  
+    button.disabled = false;
+    button.classList.remove('opacity-60');
+    if (error) {
+      list.replaceChildren(createTextElement('div', 'p-8 text-center text-xs text-red-700', `검색 오류: ${error.message}`));
+      showStatus('검색 RPC 실행에 실패했습니다. SQL 마이그레이션과 RLS 설정을 확인하세요.', 'error');
+      return;
+    }
+    const total = data?.[0]?.total_count || 0;
+    $('#searchResultsSummary').textContent = `총 ${Number(total).toLocaleString('ko-KR')}건 중 최대 50건 표시`;
+    list.replaceChildren();
+    if (!data?.length) {
+      list.appendChild(createTextElement('div', 'p-8 text-center text-xs text-slate-500', '조건에 맞는 기사가 없습니다.'));
+      return;
+    }
+    data.forEach(article => list.appendChild(createArticleRow(article, { showCheckbox: true })));
+  }
+  
+  async function openArticle(articleId) {
+    if (!supabase) return;
+    showStatus('기사와 엔터티를 불러오는 중입니다…', 'info');
+    const { data, error } = await supabase
+      .from('articles')
+      .select(`id,title,subtitle,author_name,published_on,primary_section_name,secondary_section_name,body_html,article_entity_mentions(surface_text,confidence,entity:entities(id,kind,canonical_name))`)
+      .eq('id', articleId)
+      .single();
+    if (error) {
+      showStatus(`기사 조회 실패: ${error.message}`, 'error');
+      return;
+    }
+  
+    $('#viewerLegacyScanPanel')?.classList.add('hidden');
+    $('#viewerTextModeControls')?.classList.add('hidden');
+    const articlePanel = $('#viewerArticlePanel');
+    if (articlePanel) articlePanel.className = 'w-full bg-white flex flex-col overflow-y-auto scrollbar-custom';
+    $('#viewerArticleTitle').textContent = data.title;
+    $('#viewerTopDate').textContent = formatDate(data.published_on);
+    const section = [data.primary_section_name, data.secondary_section_name].filter(Boolean).join(' · ') || '기사';
+    $('#viewerTopSection').textContent = section;
+    $('#viewerSectionBadge').textContent = section;
+  
+    const meta = $('#viewerArticleMeta');
+    meta.replaceChildren();
+    meta.appendChild(createTextElement('span', '', `발행: ${formatDate(data.published_on)}`));
+    if (data.author_name) meta.appendChild(createTextElement('span', '', `취재: ${data.author_name}`));
+    if (data.subtitle) meta.appendChild(createTextElement('span', 'w-full mt-1 text-slate-700', data.subtitle));
+  
+    const body = $('#articleContent');
+    body.innerHTML = DOMPurify.sanitize(data.body_html || '', {
+      USE_PROFILES: { html: true },
+      FORBID_TAGS: ['script', 'style', 'iframe', 'img', 'form', 'object', 'embed', 'svg', 'math'],
+      FORBID_ATTR: ['style', 'href', 'src', 'srcset', 'target', 'rel']
+    });
+  
+    const badges = $('#viewerEntityBadges');
+    badges.replaceChildren();
+    const seen = new Set();
+    const mentions = (data.article_entity_mentions || []).filter(item => item.entity);
+    mentions.forEach(item => {
+      if (seen.has(item.entity.id)) return;
+      seen.add(item.entity.id);
+      const badge = createTextElement(
+        'button',
+        'bg-white border border-crimson-200 px-2 py-1 rounded-lg font-bold hover:bg-crimson-50 transition',
+        `[${KIND_LABELS[item.entity.kind] || item.entity.kind}] ${item.entity.canonical_name}`
+      );
+      badge.addEventListener('click', () => loadGraph([Number(data.id)]));
+      badges.appendChild(badge);
+    });
+    if (!seen.size) badges.appendChild(createTextElement('span', 'text-slate-500', '승인된 엔터티가 없습니다.'));
+    selectedArticleIds.add(Number(data.id));
+    updateGraphButton();
+    window.navigateTo('viewer');
+    showStatus(`XLSX 수록 기사 #${data.id}를 표시 중입니다.`, 'ok');
+  }
+  
+  function styleGraphNode(raw) {
+    const group = GROUP_MAP[raw.group] || 'culture';
+    return { ...raw, group, ...GROUP_STYLES[group] };
+  }
+  
+  function graphDetails(nodes, edges) {
+    const byId = new Map(nodes.map(node => [node.id, node]));
+    const details = {};
+    nodes.forEach(node => {
+      const neighbors = edges.filter(edge => edge.from === node.id || edge.to === node.id).slice(0, 30).map(edge => {
+        const neighbor = byId.get(edge.from === node.id ? edge.to : edge.from);
+        return { name: neighbor?.label || '알 수 없음', type: KIND_LABELS[neighbor?.rawKind] || neighbor?.group || '엔터티', relation: edge.label };
+      });
+      details[node.id] = {
+        type: KIND_LABELS[node.rawKind] || KIND_LABELS[node.group] || '엔터티',
+        badgeClass: 'bg-crimson-100 text-crimson-900',
+        title: node.label,
+        sub: node.publishedOn ? `발행일 ${formatDate(node.publishedOn)}` : `연결 기사 ${node.articleCount || 0}건`,
+        desc: node.description || '승인된 기사 멘션과 관계를 바탕으로 구성된 엔터티입니다.',
+        neighbors,
+        articles: node.articleId ? [{ num: formatDate(node.publishedOn), title: node.label, articleId: node.articleId }] : []
+      };
+    });
+    return details;
+  }
+  
+  async function loadGraph(articleIds = [...selectedArticleIds]) {
+    if (!supabase || !articleIds.length) {
+      showStatus('관계망으로 볼 기사를 한 건 이상 선택하세요.', 'warn');
+      return;
+    }
+    showStatus(`선택 기사 ${articleIds.length}건의 관계망을 구성 중입니다…`, 'info');
+    const { data, error } = await supabase.rpc('get_article_graph', {
+      p_article_ids: articleIds.map(Number),
+      p_min_confidence: 0.85,
+      p_include_cooccurrence: true,
+      p_max_entities: 120
+    });
+    if (error) {
+      showStatus(`관계망 조회 실패: ${error.message}`, 'error');
+      return;
+    }
+    const nodes = (data?.nodes || []).map(raw => {
+      const styled = styleGraphNode(raw);
+      styled.rawKind = raw.group;
+      return styled;
+    });
+    const edges = (data?.edges || []).map(raw => ({
+      ...raw,
+      color: { color: raw.kind === 'semantic' ? '#7e22ce' : raw.kind === 'cooccurrence' ? '#94a3b8' : '#ef4444' },
+      dashes: raw.kind === 'cooccurrence',
+      arrows: raw.kind === 'semantic' ? 'to' : undefined,
+      width: Math.min(1 + Number(raw.weight || 1) * 0.35, 5)
+    }));
+    const articles = nodes.filter(node => node.group === 'article').map(node => ({
+      id: node.id,
+      articleId: node.articleId,
+      title: node.label,
+      date: formatDate(node.publishedOn),
+      issue: '온라인 기사',
+      tag: '실데이터'
+    }));
+    window.kudatApplyGraphData({ articles, nodes, edges, details: graphDetails(nodes, edges) });
+    window.navigateTo('graph');
+    showStatus(`관계망: 기사 ${data.articleCount || 0}건 · 엔터티 ${data.entityCount || 0}개${data.truncated ? ' (상위 120개 표시)' : ''}`, 'ok');
+  }
+  
+  function updateBirthDays() {
+    const year = Number($('#birthYear').value);
+    const month = Number($('#birthMonth').value);
+    const daySelect = $('#birthDay');
+    const previous = Number(daySelect.value) || 1;
+    const count = new Date(year, month, 0).getDate();
+    daySelect.replaceChildren();
+    for (let day = 1; day <= count; day += 1) {
+      const option = new Option(String(day), String(day), false, day === Math.min(previous, count));
+      daySelect.add(option);
+    }
+  }
+  
+  async function searchBirthday() {
+    if (!supabase) {
+      showStatus('먼저 Supabase 연결 정보를 입력하세요.', 'warn');
+      return;
+    }
+    const year = $('#birthYear').value;
+    const month = String($('#birthMonth').value).padStart(2, '0');
+    const day = String($('#birthDay').value).padStart(2, '0');
+    const targetDate = `${year}-${month}-${day}`;
+    const card = $('#birthdayResultCard');
+    const list = $('#birthdayResultsList');
+    card.classList.remove('hidden');
+    $('#birthdayResultTitle').textContent = `고대신문 ${formatDate(targetDate)}`;
+    $('#birthdayNearestDates').textContent = '';
+    list.replaceChildren(createTextElement('div', 'p-8 text-center text-xs text-slate-500', '기사를 찾는 중…'));
+  
+    const { data, error } = await supabase.rpc('articles_on_date', { p_date: targetDate });
+    if (error) {
+      list.replaceChildren(createTextElement('div', 'p-8 text-center text-xs text-red-700', `조회 오류: ${error.message}`));
+      return;
+    }
+    list.replaceChildren();
+    if (data?.length) {
+      data.forEach(article => list.appendChild(createArticleRow(article, { showCheckbox: true })));
+      $('#birthdayNearestDates').textContent = `이 날짜에 발행된 온라인 기사 ${data.length}건`;
+    } else {
+      list.appendChild(createTextElement('div', 'p-8 text-center text-xs text-slate-500', '이 날짜에 발행된 온라인 기사가 없습니다.'));
+      const nearest = await supabase.rpc('nearest_publication_dates', { p_date: targetDate });
+      if (!nearest.error && nearest.data?.length) {
+        $('#birthdayNearestDates').textContent = nearest.data.map(item =>
+          `${item.direction === 'previous' ? '이전' : '다음'} 발행일 ${formatDate(item.published_on)} (${item.article_count}건)`
+        ).join(' · ');
+      }
+    }
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  
+  function configureControls() {
+    $('#dateFrom').min = KUDAT_CONFIG.dataMinDate;
+    $('#dateFrom').max = KUDAT_CONFIG.dataMaxDate;
+    $('#dateTo').min = KUDAT_CONFIG.dataMinDate;
+    $('#dateTo').max = KUDAT_CONFIG.dataMaxDate;
+  
+    const yearSelect = $('#birthYear');
+    if (yearSelect) {
+      yearSelect.replaceChildren();
+      const minYear = Number(KUDAT_CONFIG.dataMinDate.slice(0, 4));
+      const maxYear = Number(KUDAT_CONFIG.dataMaxDate.slice(0, 4));
+      for (let year = minYear; year <= maxYear; year += 1) yearSelect.add(new Option(String(year), String(year)));
+      yearSelect.value = String(minYear);
+    }
+    const monthSelect = $('#birthMonth');
+    if (monthSelect) {
+      monthSelect.replaceChildren();
+      for (let month = 1; month <= 12; month += 1) monthSelect.add(new Option(String(month), String(month)));
+      monthSelect.value = '1';
+    }
+    updateBirthDays();
+    $('#birthYear')?.addEventListener('change', updateBirthDays);
+    $('#birthMonth')?.addEventListener('change', updateBirthDays);
+    $('#searchButton')?.addEventListener('click', runSearch);
+    $('#homeSearchInput')?.addEventListener('keydown', event => {
+      if (event.key === 'Enter') runSearch();
+    });
+    $('#birthdaySearchButton')?.addEventListener('click', searchBirthday);
+    $('#openSelectedGraphButton')?.addEventListener('click', () => loadGraph());
+  }
+  
+  async function initialize() {
+    configureControls();
+    window.kudatApplyGraphData?.({ articles: [], nodes: [], edges: [], details: {} });
+    $('#viewerLegacyScanPanel')?.classList.add('hidden');
+    $('#viewerTextModeControls')?.classList.add('hidden');
+    const panel = $('#viewerArticlePanel');
+    if (panel) panel.className = 'w-full bg-white flex flex-col overflow-y-auto scrollbar-custom';
+    $('#articleContent').replaceChildren(createTextElement('p', 'text-center text-slate-500 py-12', '검색 결과에서 기사를 선택하면 실제 본문이 표시됩니다.'));
+  
+    if (!KUDAT_CONFIG.supabaseUrl || !KUDAT_CONFIG.supabasePublishableKey) {
+      showStatus('Supabase 미연결: 이 HTML 하단의 KUDAT_SUPABASE_CONFIG에 프로젝트 URL과 publishable 키를 입력하세요.', 'warn');
+      return;
+    }
+    supabase = createClient(KUDAT_CONFIG.supabaseUrl, KUDAT_CONFIG.supabasePublishableKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+    const { count, error } = await supabase.from('articles').select('id', { count: 'exact', head: true });
+    if (error) {
+      showStatus(`Supabase 연결 실패: ${error.message}`, 'error');
+    } else {
+      showStatus(`Supabase 실데이터 연결됨 · 공개 기사 ${Number(count || 0).toLocaleString('ko-KR')}건`, 'ok');
+    }
+  }
+  
+  window.kudatOpenArticle = openArticle;
+  initialize();
+  </script>
+</body>
+</html>

@@ -309,7 +309,13 @@
           <i class="fa-solid fa-house"></i>
           <span>1. 메인 홈</span>
         </button>
-        <button id="nav-btn-graph" onclick="navigateTo('graph')" class="nav-tab px-3 py-1.5 sm:py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition flex items-center space-x-1.5 shrink-0">
+        <button
+          id="nav-btn-graph"
+          onclick="window.kudatOpenGraph
+            ? window.kudatOpenGraph()
+            : navigateTo('home')"
+          class="nav-tab px-3 py-1.5 sm:py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition flex items-center space-x-1.5 shrink-0"
+        >
           <i class="fa-solid fa-circle-nodes text-crimson-700"></i>
           <span>2. 지식 네트워크 탐색기</span>
         </button>
@@ -378,7 +384,12 @@
                 <button class="px-3 py-1.5 bg-crimson-700 text-white rounded-lg text-[11px] sm:text-xs shadow-xs border border-crimson-500/40">
                   <i class="fa-solid fa-magnifying-glass mr-1"></i>통합 검색
                 </button>
-                <button onclick="navigateTo('graph')" class="px-3 py-1.5 bg-white/10 text-crimson-100 hover:bg-white/20 rounded-lg transition text-[11px] sm:text-xs border border-white/10">
+                <button
+                  onclick="window.kudatOpenGraph
+                    ? window.kudatOpenGraph()
+                    : navigateTo('home')"
+                  class="px-3 py-1.5 bg-white/10 text-crimson-100 hover:bg-white/20 rounded-lg transition text-[11px] sm:text-xs border border-white/10"
+                >
                   <i class="fa-solid fa-diagram-project mr-1"></i>개체명(Entity) 탐색
                 </button>
                 <button onclick="navigateTo('viewer')" class="px-3 py-1.5 bg-white/10 text-crimson-100 hover:bg-white/20 rounded-lg transition text-[11px] sm:text-xs border border-white/10">
@@ -589,7 +600,7 @@
                 <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">경제·청년</div>
                 <div class="text-[9px] text-slate-400 mt-0.5">1,930건</div>
               </div>
-              <div onclick="navigateTo('graph'); setTimeout(()=>loadScenario('koyon'), 200);" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
+              <div onclick="window.kudatOpenGraph ? window.kudatOpenGraph() : navigateTo('home')" class="bg-slate-50 hover:bg-crimson-50 border border-slate-200 hover:border-crimson-300 rounded-xl p-3 text-center cursor-pointer transition group">
                 <div class="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center mx-auto text-crimson-800 shadow-2xs mb-1.5 sm:mb-2 group-hover:bg-crimson-800 group-hover:text-white transition"><i class="fa-solid fa-trophy"></i></div>
                 <div class="text-xs font-bold text-slate-800 group-hover:text-crimson-800">체육·고연전</div>
                 <div class="text-[9px] text-slate-400 mt-0.5">3,210건</div>
@@ -1658,7 +1669,7 @@
       const statusEl = document.getElementById('activeGraphStatus');
       if (statusEl) {
         statusEl.textContent = selectedArticleIds.length === allArticlesList.length
-          ? `전체 지식망 (${finalNodes.length}개 노드 · ${finalEdges.length}개 관계 엣지)`
+          ? `선택 기사 지식망 (${finalNodes.length}개 노드 · ${finalEdges.length}개 관계 엣지)`
           : `재구성 지식망: ${selectedArticleIds.length}개 기사 (${finalNodes.length}개 노드 · ${finalEdges.length}개 엣지)`;
       }
 
@@ -2308,7 +2319,33 @@
     window.navigateTo('graph');
     showStatus(`관계망: 기사 ${data.articleCount || 0}건 · 엔터티 ${data.entityCount || 0}개${data.truncated ? ' (상위 120개 표시)' : ''}`, 'ok');
   }
-  
+
+  window.kudatOpenGraph = async function () {
+    if (!supabase) {
+      showStatus('Supabase 연결을 확인하세요.', 'error');
+      return;
+    }
+
+    const articleIds = [...selectedArticleIds];
+
+    if (!articleIds.length) {
+      showStatus(
+        '먼저 기사를 검색하고 관계망으로 볼 기사를 한 건 이상 선택하세요.',
+        'warn'
+      );
+
+      window.navigateTo('home');
+
+      setTimeout(() => {
+        document.querySelector('#homeSearchInput')?.focus();
+      }, 100);
+
+      return;
+    }
+
+    await loadGraph(articleIds);
+  };
+    
   function updateBirthDays() {
     const year = Number($('#birthYear').value);
     const month = Number($('#birthMonth').value);
